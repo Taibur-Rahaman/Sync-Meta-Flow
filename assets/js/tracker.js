@@ -27,21 +27,28 @@
   function metaTrack(name, payload, id) {
     if (typeof window.fbq !== 'function' || !data.metaPixelId) return;
     var params = Object.assign({}, payload || {});
-    delete params.session_key;
-    delete params.page_url;
-    delete params.event_id;
+    delete params.session_key; delete params.page_url; delete params.event_id; delete params.fbp; delete params.fbc;
     window.fbq('track', name, params, id ? { eventID: id } : undefined);
   }
-  function track(eventName, payload, metaName) {
+  function track(eventName, payload, metaName, forcedId) {
     payload = payload || {};
     payload.page_url = window.location.href;
     payload.session_key = data.sessionKey || '';
-    payload.event_id = payload.event_id || eventId(eventName);
+    payload.fbp = data.fbp || readCookie('_fbp') || '';
+    payload.fbc = data.fbc || readCookie('smf_fbc') || '';
+    payload.event_id = forcedId || payload.event_id || eventId(eventName);
     send(eventName, payload);
     if (metaName) metaTrack(metaName, payload, payload.event_id);
     return payload.event_id;
   }
 
+  if (attribution.fbclid) {
+    var fbc = readCookie('smf_fbc');
+    if (!fbc) {
+      fbc = 'fb.1.' + Date.now() + '.' + attribution.fbclid;
+      writeCookie('smf_fbc', fbc, 90);
+    }
+  }
   if (Object.keys(attribution).length) {
     var existing = {};
     try { existing = JSON.parse(readCookie('smf_attribution') || '{}'); } catch (e) {}
@@ -52,7 +59,6 @@
   window.SMF = window.SMF || {};
   window.SMF.track = track;
   track('page_view', {}, 'PageView');
-
   if (data.isProduct) track('view_content', { product_id: data.productId || 0, product_name: data.productName || '' }, 'ViewContent');
 
   if (window.jQuery) {
@@ -64,14 +70,8 @@
   }
   if (data.isCheckout) track('initiate_checkout', {}, 'InitiateCheckout');
 
-  // Purchase is fired on the WooCommerce order-received page with the same event ID
-  // saved on the order. That ID can be reused by server-side CAPI for deduplication.
   if (data.isOrderReceived && data.purchaseEventId) {
-    var purchasePayload = {
-      value: Number(data.orderTotal || 0),
-      currency: data.currency || '',
-      order_id: String(data.orderId || '')
-    };
-    track('purchase', purchasePayload, 'Purchase');
+    var purchasePayload = { value: Number(data.orderTotal || 0), currency: data.currency || '', order_id: String(data.orderId || '') };
+    track('purchase', purchasePayload, 'Purchase', data.purchaseEventId);
   }
 })();
