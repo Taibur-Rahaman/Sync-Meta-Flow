@@ -4,19 +4,50 @@ Tags: woocommerce, facebook, meta, attribution, analytics, ecommerce, roas, cour
 Requires at least: 6.4
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 2.0.1
+Stable tag: 2.1.0
 License: GPLv2 or later
 
 WooCommerce revenue intelligence for Meta-driven stores. Sync Meta Flow connects advertising attribution, WooCommerce order milestones, courier delivery outcomes and realized revenue so merchants can optimize for delivered business outcomes rather than purchases alone.
 
-== v2.0.1 — Sell-ready hardening ==
-* Added unified order journey, privacy exporter/eraser, explicit uninstall deletion and safer diagnostics.
-* Hardened courier webhook idempotency and retry behavior.
-* Hardened CAPI queue processing with locking, claiming, stale recovery and bounded retries.
-* Added attribution model persistence and Attribution Intelligence with Last Touch, First Touch, First + Last 50/50 and Assisted First-Touch Influence views.
-* Added attribution-aware campaign decisions, ad-level detail, browser funnel analytics and CSV/JSON exports.
-* Added Courier Operations with dispatch queue, customer-risk scoring, provider recommendations and webhook performance reporting.
-* Added installer upgrade initialization for core options and courier-operation defaults.
+== v2.1.0 — Production release hardening ==
+* Promoted the plugin version to 2.1.0 after completing profitability, executive dashboard and merchant decision intelligence phases.
+* Added Decision Center recommendations for campaign scale/stop/review, margin risk, courier health/economics and CAPI reliability.
+* Added estimated contribution-profit and contribution-margin intelligence with configurable COGS, payment fees and courier delivery/return costs.
+* Added Executive Dashboard combining revenue, profitability, campaign, courier and system-health signals.
+* Hardened uninstall cleanup so the actual courier recovery retry cron is removed when explicit data deletion is enabled.
+* Preserved conservative uninstall behavior: plugin data remains unless the merchant explicitly enables deletion.
+
+== Decision Center ==
+Decision Center turns observed financial and operational signals into advisory merchant actions:
+* SCALE — positive contribution profit, margin at least 20% and ROAS at least 2×.
+* STOP/REVIEW — campaign spend with negative estimated contribution profit.
+* WATCH — low contribution margin on campaigns with spend.
+* Courier health/economics warnings from observed provider performance and financial impact.
+* CAPI failure and backlog alerts.
+* Overall negative contribution-profit warning.
+
+Recommendations are advisory only. Sync Meta Flow never automatically changes ad budgets, orders or courier routing.
+
+== Executive Dashboard ==
+The Executive Dashboard provides a 7/30/90-day management view of:
+* Purchase and delivered revenue.
+* Estimated contribution profit and margin.
+* Ad spend and ROAS.
+* Delivery, cancellation and return quality.
+* Campaign and courier leaderboards.
+* Courier health and CAPI system health.
+* Attention alerts and quick links into operational screens.
+
+== Profitability and financial reporting ==
+Contribution profitability is an estimated operating metric, not accounting-grade net profit. The calculation can include:
+* Meta ad spend matched at campaign level.
+* Delivered revenue and returned/cancelled outcomes from the purchase cohort.
+* Configurable COGS percentage.
+* Configurable payment-fee percentage.
+* Configurable courier delivery cost per delivered order.
+* Configurable courier return cost per returned order.
+
+Supported attribution views are Last Touch, First Touch, First + Last 50/50 and Assisted. Attribution models are alternative analytical views and must not be added together. Campaign spend must use the same currency as revenue before ROAS or contribution economics are interpreted.
 
 == Courier Operations ==
 Courier Operations is an operational intelligence layer, not a fraud engine. It provides:
@@ -25,7 +56,9 @@ Courier Operations is an operational intelligence layer, not a fraud engine. It 
 * Delivery, return and cancellation history used as dispatch signals.
 * Configured-provider recommendations without inventing undocumented courier APIs.
 * Provider webhook event/processed/failed counts.
-* Configurable customer-risk history window.
+* Provider health, processing SLA and delivery SLA observations.
+* Courier financial/operational impact reporting.
+* Configurable customer-risk history window and merchant-configured SLA thresholds.
 
 Risk scores are advisory. They must not be treated as definitive fraud, identity or credit decisions. Native shipment creation remains provider-specific. Steadfast is supported by the existing native adapter; Pathao and RedX are not called until their official merchant API contracts are implemented and verified.
 
@@ -62,6 +95,7 @@ Browser funnel reporting covers PageView, ViewContent, AddToCart, InitiateChecko
 * Net Realized Revenue = Delivered Revenue − Returned/Refunded order value within the selected purchase cohort.
 * Purchase cohort is based on purchase date; later delivery, cancellation and return events update the outcome of that cohort.
 * SCALE / WATCH / KILL thresholds are operational heuristics. Merchants should also account for product margin, shipping, COD, payment fees, refunds and other fulfillment costs.
+* Contribution profit is estimated from merchant-configured assumptions and observed order/courier outcomes; it is not accounting-grade net profit.
 * First-touch and last-touch ROAS are alternative attribution views. Never add them together.
 
 == Privacy and data ==
@@ -69,7 +103,7 @@ Sync Meta Flow can store attribution identifiers, tracking events, WooCommerce o
 
 The plugin integrates with WordPress privacy-policy guidance, personal-data export and personal-data erasure for plugin-owned order-related records. Tracking sessions that cannot be linked to an identified customer are not guessed or indiscriminately deleted by the privacy eraser.
 
-Uninstall preserves data by default. When the merchant explicitly enables deletion, plugin-owned tables, options and scheduled jobs are removed.
+Uninstall preserves data by default. When the merchant explicitly enables deletion, plugin-owned tables, options and scheduled jobs are removed, including the courier recovery retry job.
 
 == Installation ==
 1. Install and activate WooCommerce.
@@ -79,9 +113,10 @@ Uninstall preserves data by default. When the merchant explicitly enables deleti
 5. Open Meta Flow > Diagnostics and resolve blocking checks.
 6. Open Meta Flow > Meta Ads Sync, enter the Meta Ad Account ID, save and run an initial sync.
 7. Confirm the detected ad-account currency before interpreting financial reports.
-8. Review Meta Flow > Ad Spend & ROAS and Meta Flow > Attribution Intelligence.
-9. Configure Courier & Delivery and Courier Operations if a courier workflow is needed.
-10. For Steadfast, enter merchant credentials and create shipments from WooCommerce orders.
+8. Open Meta Flow > Profitability to configure COGS, payment fees and courier cost assumptions.
+9. Review Meta Flow > Executive Dashboard and Meta Flow > Decision Center for merchant-level actions.
+10. Configure Courier & Delivery and Courier Operations if a courier workflow is needed.
+11. For Steadfast, enter merchant credentials and create shipments from WooCommerce orders.
 
 == Production checklist ==
 * Use HTTPS.
@@ -89,15 +124,24 @@ Uninstall preserves data by default. When the merchant explicitly enables deleti
 * Never paste Meta or courier credentials into GitHub issues, screenshots, logs or public documentation.
 * Configure a real server cron for low-traffic stores instead of relying exclusively on WP-Cron.
 * Review privacy/consent requirements for tracking and third-party data sharing in the store's jurisdiction.
-* Test Purchase deduplication, delivery transitions, courier retries, risk scoring and returned orders on a staging store before production.
+* Test Purchase deduplication, delivery transitions, courier retries, risk scoring, returned orders and Decision Center thresholds on a staging store before production.
 * Verify Meta account currency and attribution IDs before evaluating ROAS.
-* Monitor Meta Flow > Diagnostics after launch.
+* Configure realistic COGS, payment-fee and courier-cost assumptions before using contribution-profit recommendations.
+* Monitor Meta Flow > Diagnostics and Meta Flow > Courier Recovery after launch.
 * Confirm WooCommerce HPOS and current WooCommerce compatibility on the target store.
 
 == Release status ==
-2.0.1 remains a production-oriented release candidate. Core reliability, attribution intelligence and courier operations are implemented at plugin level, but live staging tests remain required for each merchant's Meta account, WooCommerce version, theme, consent configuration and courier provider.
+2.1.0 is the production-oriented release following the core reliability, attribution, courier, profitability, executive and decision-intelligence hardening phases. Live staging tests remain required for each merchant's Meta account, WooCommerce version, theme, consent configuration and courier provider. Contribution-profit recommendations remain advisory and depend on merchant-configured assumptions.
 
 == Changelog ==
+= 2.1.0 =
+* Promoted release version after completion of merchant decision intelligence.
+* Added Decision Center advisory recommendations.
+* Added Executive Dashboard management view.
+* Added estimated contribution profitability and configurable fulfillment economics.
+* Hardened courier recovery uninstall cleanup.
+* Updated production onboarding and verification guidance.
+
 = 2.0.1 =
 * Added HPOS-compatible unified order journey.
 * Added privacy exporter/eraser integration and explicit uninstall data-deletion control.
