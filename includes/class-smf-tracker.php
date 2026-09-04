@@ -2,6 +2,8 @@
 defined('ABSPATH') || exit;
 
 class SMF_Tracker {
+    private static $attribution_fields = array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id','campaign_id','adset_id','ad_id');
+
     public static function init() {
         add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue'));
         add_action('wp_head', array(__CLASS__, 'render_meta_pixel'), 1);
@@ -22,7 +24,7 @@ class SMF_Tracker {
             'productId' => function_exists('is_product') && is_product() ? get_the_ID() : 0,
             'productName' => function_exists('is_product') && is_product() ? get_the_title() : '',
             'isProduct' => function_exists('is_product') && is_product(),
-            'isCheckout' => function_exists('is_checkout') && is_checkout() && !function_exists('is_order_received_page') || (function_exists('is_checkout') && is_checkout() && !is_order_received_page()),
+            'isCheckout' => function_exists('is_checkout') && is_checkout() && (!function_exists('is_order_received_page') || !is_order_received_page()),
             'isCart' => function_exists('is_cart') && is_cart(),
             'isOrderReceived' => (bool) $order,
             'orderId' => $order ? $order->get_id() : 0,
@@ -61,7 +63,7 @@ class SMF_Tracker {
     public static function render_script() {
         if (is_admin()) return;
         $values = array();
-        foreach (array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term') as $key) if (isset($_GET[$key])) $values[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
+        foreach (self::$attribution_fields as $key) if (isset($_GET[$key])) $values[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
         echo '<script>window.SMF_ATTRIBUTION=' . wp_json_encode($values) . ';</script>';
     }
 
@@ -77,18 +79,27 @@ class SMF_Tracker {
     public static function get_or_create_session() {
         $cookie = isset($_COOKIE['smf_session']) ? sanitize_text_field(wp_unslash($_COOKIE['smf_session'])) : '';
         if ($cookie && preg_match('/^[a-f0-9-]{36}$/', $cookie)) return $cookie;
-        $data = array();
-        foreach (array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term') as $key) if (isset($_GET[$key])) $data[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
+        $data = self::request_attribution();
         $key = self::save_session($data);
         if (!headers_sent()) setcookie('smf_session', $key, time() + (30 * DAY_IN_SECONDS), COOKIEPATH ?: '/', COOKIE_DOMAIN, is_ssl(), true);
         return $key;
+    }
+
+    private static function request_attribution() {
+        $data = array();
+        foreach (self::$attribution_fields as $key) if (isset($_GET[$key])) $data[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
+        $data['fbp'] = isset($_COOKIE['_fbp']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbp'])) : '';
+        $data['fbc'] = self::get_fbc_cookie();
+        return $data;
     }
 
     public static function save_session($data) {
         global $wpdb;
         $key = wp_generate_uuid4(); $now = current_time('mysql');
         $row = array('session_key'=>$key,'landing_url'=>isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : null,'first_seen'=>$now,'last_seen'=>$now);
-        foreach (array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term') as $field) $row[$field] = isset($data[$field]) ? sanitize_text_field($data[$field]) : null;
+        foreach (self::$attribution_fields as $field) $row[$field] = isset($data[$field]) ? sanitize_text_field($data[$field]) : null;
+        $row['fbp'] = !empty($data['fbp']) ? sanitize_text_field($data['fbp']) : null;
+        $row['fbc'] = !empty($data['fbc']) ? sanitize_text_field($data['fbc']) : null;
         $wpdb->insert($wpdb->prefix . 'smf_tracking_sessions', $row);
         return $key;
     }
@@ -97,7 +108,9 @@ class SMF_Tracker {
         global $wpdb;
         if (!preg_match('/^[a-f0-9-]{36}$/', $session_key)) return false;
         $updates = array('last_seen'=>current_time('mysql'));
-        foreach (array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term') as $field) if (!empty($attribution[$field])) $updates[$field] = sanitize_text_field($attribution[$field]);
+        foreach (self::$attribution_fields as $field) if (!empty($attribution[$field])) $updates[$field] = sanitize_text_field($attribution[$field]);
+        if (!empty($attribution['fbp'])) $updates['fbp'] = sanitize_text_field($attribution['fbp']);
+        if (!empty($attribution['fbc'])) $updates['fbc'] = sanitize_text_field($attribution['fbc']);
         return false !== $wpdb->update($wpdb->prefix . 'smf_tracking_sessions', $updates, array('session_key'=>$session_key));
     }
 }
