@@ -61,6 +61,9 @@ jobs:
       - name: Profitability intelligence tests
         if: matrix.php-version == '8.3'
         run: php tests/test-profitability-intelligence.php
+      - name: Executive dashboard tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-executive-dashboard.php
       - name: CAPI idempotency tests
         if: matrix.php-version == '8.3'
         run: php tests/test-capi-idempotency.php
