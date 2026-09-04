@@ -2,8 +2,13 @@
 defined('ABSPATH') || exit;
 
 class SMF_Installer {
-    public static function activate(){self::create_tables();update_option('smf_version',SMF_VERSION);add_option('smf_meta_enabled','no');add_option('smf_attribution_model','last_touch');}
-    public static function maybe_upgrade(){if(get_option('smf_version')!==SMF_VERSION){self::create_tables();update_option('smf_version',SMF_VERSION);}}
+    public static function activate(){self::create_tables();self::ensure_options();update_option('smf_version',SMF_VERSION);}
+    public static function maybe_upgrade(){if(get_option('smf_version')!==SMF_VERSION){self::create_tables();self::ensure_options();update_option('smf_version',SMF_VERSION);}}
+    private static function ensure_options(){
+        add_option('smf_meta_enabled','no'); add_option('smf_attribution_model','last_touch');
+        add_option('smf_delete_data_on_uninstall','no'); add_option('smf_courier_provider','generic');
+        add_option('smf_courier_risk_window',90);
+    }
     private static function create_tables(){global $wpdb;require_once ABSPATH.'wp-admin/includes/upgrade.php';$charset=$wpdb->get_charset_collate();$events=$wpdb->prefix.'smf_order_events';$sessions=$wpdb->prefix.'smf_tracking_sessions';$tracking=$wpdb->prefix.'smf_tracking_events';$queue=$wpdb->prefix.'smf_capi_queue';$spend=$wpdb->prefix.'smf_campaign_spend';$courier=$wpdb->prefix.'smf_courier_events';
         dbDelta("CREATE TABLE $events (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,order_id bigint(20) unsigned NOT NULL,event_type varchar(64) NOT NULL,old_status varchar(32) DEFAULT NULL,new_status varchar(32) DEFAULT NULL,source varchar(64) DEFAULT NULL,metadata longtext DEFAULT NULL,created_at datetime NOT NULL,PRIMARY KEY(id),KEY order_id(order_id),KEY event_type(event_type),KEY event_created(event_type,created_at),KEY created_at(created_at)) $charset;");
         dbDelta("CREATE TABLE $sessions (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,session_key varchar(64) NOT NULL,fbclid text DEFAULT NULL,fbp varchar(255) DEFAULT NULL,fbc varchar(255) DEFAULT NULL,utm_source varchar(255) DEFAULT NULL,utm_medium varchar(255) DEFAULT NULL,utm_campaign varchar(255) DEFAULT NULL,utm_content varchar(255) DEFAULT NULL,utm_term varchar(255) DEFAULT NULL,utm_id varchar(255) DEFAULT NULL,campaign_id varchar(255) DEFAULT NULL,adset_id varchar(255) DEFAULT NULL,ad_id varchar(255) DEFAULT NULL,first_touch longtext DEFAULT NULL,last_touch longtext DEFAULT NULL,landing_url text DEFAULT NULL,first_seen datetime NOT NULL,last_seen datetime NOT NULL,PRIMARY KEY(id),UNIQUE KEY session_key(session_key),KEY fbclid(fbclid(255)),KEY utm_campaign(utm_campaign(191))) $charset;");
