@@ -3,7 +3,7 @@
  * Plugin Name: Sync Meta Flow
  * Plugin URI: https://github.com/Taibur-Rahaman/Sync-Meta-Flow
  * Description: WooCommerce Meta revenue intelligence with first/last-touch attribution, order-flow, customer quality, ROAS, diagnostics, privacy controls and courier intelligence.
- * Version: 2.1.0
+ * Version: 2.0.1
  * Author: Taibur Rahaman
  * License: GPL-2.0-or-later
  * Requires at least: 6.4
@@ -11,7 +11,7 @@
  * Requires Plugins: woocommerce
  */
 defined('ABSPATH') || exit;
-define('SMF_VERSION','2.1.0');
+define('SMF_VERSION','2.0.1');
 define('SMF_FILE',__FILE__); define('SMF_DIR',plugin_dir_path(__FILE__)); define('SMF_URL',plugin_dir_url(__FILE__));
 require_once SMF_DIR.'includes/class-smf-installer.php'; require_once SMF_DIR.'includes/class-smf-security.php'; require_once SMF_DIR.'includes/class-smf-attribution.php'; require_once SMF_DIR.'includes/class-smf-tracker.php'; require_once SMF_DIR.'includes/class-smf-order-events.php'; require_once SMF_DIR.'includes/class-smf-order-status.php'; require_once SMF_DIR.'includes/class-smf-meta-capi.php'; require_once SMF_DIR.'includes/class-smf-spend.php'; require_once SMF_DIR.'includes/class-smf-meta-insights.php'; require_once SMF_DIR.'includes/class-smf-courier.php'; require_once SMF_DIR.'includes/class-smf-courier-timeline.php'; require_once SMF_DIR.'includes/class-smf-attribution-report.php'; require_once SMF_DIR.'includes/class-smf-quality.php'; require_once SMF_DIR.'includes/class-smf-diagnostics.php'; require_once SMF_DIR.'includes/class-smf-privacy.php'; require_once SMF_DIR.'includes/class-smf-order-journey.php'; require_once SMF_DIR.'includes/class-smf-admin.php';
 register_activation_hook(__FILE__,array('SMF_Installer','activate')); register_deactivation_hook(__FILE__,array('SMF_Installer','deactivate'));
