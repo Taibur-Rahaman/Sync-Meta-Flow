@@ -2,37 +2,24 @@
 defined('ABSPATH') || exit;
 
 class SMF_Meta_Insights {
-    const GRAPH_VERSION = 'v23.0';
-    const CRON_HOOK = 'smf_sync_meta_spend';
-
-    public static function init() {
-        add_filter('cron_schedules', array(__CLASS__, 'cron_schedule'));
-        add_action(self::CRON_HOOK, array(__CLASS__, 'cron_sync'));
-        add_action('admin_post_smf_sync_meta_spend', array(__CLASS__, 'manual_sync'));
-        if (!wp_next_scheduled(self::CRON_HOOK)) wp_schedule_event(time() + 300, 'six_hours', self::CRON_HOOK);
-    }
-    public static function cron_schedule($schedules) {
-        $schedules['six_hours'] = array('interval'=>21600,'display'=>'Every 6 hours'); return $schedules;
-    }
-    public static function manual_sync() {
-        if (!current_user_can('manage_woocommerce')) wp_die('Unauthorized');
-        check_admin_referer('smf_sync_meta_spend');
-        $r=self::sync(); set_transient('smf_meta_sync_notice',array('status'=>is_wp_error($r)?'error':'synced','message'=>is_wp_error($r)?$r->get_error_message():sprintf('%d spend rows synced.',(int)$r)),60);
-        wp_safe_redirect(admin_url('admin.php?page=smf-spend')); exit;
-    }
+    const GRAPH_VERSION = 'v23.0'; const CRON_HOOK = 'smf_sync_meta_spend';
+    public static function init(){add_filter('cron_schedules',array(__CLASS__,'cron_schedule'));add_action(self::CRON_HOOK,array(__CLASS__,'cron_sync'));add_action('admin_post_smf_sync_meta_spend',array(__CLASS__,'manual_sync'));add_action('admin_menu',array(__CLASS__,'menu'));add_action('admin_init',array(__CLASS__,'settings'));if(!wp_next_scheduled(self::CRON_HOOK))wp_schedule_event(time()+300,'six_hours',self::CRON_HOOK);}
+    public static function cron_schedule($s){$s['six_hours']=array('interval'=>21600,'display'=>'Every 6 hours');return $s;}
+    public static function settings(){register_setting('smf_settings','smf_meta_ad_account_id','sanitize_text_field');register_setting('smf_settings','smf_meta_sync_days',array('sanitize_callback'=>function($v){$v=absint($v);return in_array($v,array(7,30,90),true)?$v:30;}));}
+    public static function menu(){add_submenu_page('sync-meta-flow','Meta Ads Sync','Meta Ads Sync','manage_woocommerce','smf-meta-sync',array(__CLASS__,'page'));}
+    public static function manual_sync(){if(!current_user_can('manage_woocommerce'))wp_die('Unauthorized');check_admin_referer('smf_sync_meta_spend');$r=self::sync();set_transient('smf_meta_sync_notice',array('status'=>is_wp_error($r)?'error':'synced','message'=>is_wp_error($r)?$r->get_error_message():sprintf('%d spend rows synced.',(int)$r)),60);wp_safe_redirect(admin_url('admin.php?page=smf-meta-sync'));exit;}
     public static function cron_sync(){self::sync();}
-    public static function sync() {
-        $token=trim((string)get_option('smf_meta_access_token','')); $account=trim((string)get_option('smf_meta_ad_account_id',''));
-        if($token===''||$account==='') return new WP_Error('smf_missing_meta_credentials','Meta access token and Ad Account ID are required.');
-        $days=(int)get_option('smf_meta_sync_days',30); if(!in_array($days,array(7,30,90),true))$days=30;
-        $until=current_time('Y-m-d'); $since=wp_date('Y-m-d',strtotime('-'.($days-1).' days',current_time('timestamp')));
-        $account=preg_replace('/^act_/','',$account);
-        $url=add_query_arg(array('fields'=>'date_start,date_stop,campaign_id,adset_id,ad_id,spend','time_range'=>wp_json_encode(array('since'=>$since,'until'=>$until)),'level'=>'ad','limit'=>500,'access_token'=>$token),'https://graph.facebook.com/'.self::GRAPH_VERSION.'/act_'.rawurlencode($account).'/insights');
-        $all=array();$pages=0;
-        while($url&&$pages<20){$response=wp_remote_get($url,array('timeout'=>30,'headers'=>array('Accept'=>'application/json')));if(is_wp_error($response))return $response;$code=wp_remote_retrieve_response_code($response);$body=json_decode(wp_remote_retrieve_body($response),true);if($code<200||$code>=300||!is_array($body)){return new WP_Error('smf_meta_api_error',isset($body['error']['message'])?$body['error']['message']:'Meta Insights API request failed.',array('status'=>$code));}if(!empty($body['data']))$all=array_merge($all,$body['data']);$url=!empty($body['paging']['next'])?esc_url_raw($body['paging']['next']):'';$pages++;}
-        global $wpdb;$table=$wpdb->prefix.'smf_campaign_spend';
-        $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE source=%s AND spend_date BETWEEN %s AND %s",'meta_api',$since,$until));$count=0;
-        foreach($all as $row){$date=!empty($row['date_start'])?sanitize_text_field($row['date_start']):'';$amount=isset($row['spend'])?(float)$row['spend']:0;if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)||$amount<0)continue;$campaign=!empty($row['campaign_id'])?sanitize_text_field($row['campaign_id']):'';$adset=!empty($row['adset_id'])?sanitize_text_field($row['adset_id']):'';$ad=!empty($row['ad_id'])?sanitize_text_field($row['ad_id']):'';$wpdb->insert($table,array('spend_date'=>$date,'campaign_id'=>$campaign,'adset_id'=>$adset,'ad_id'=>$ad,'amount'=>$amount,'currency'=>'BDT','source'=>'meta_api','created_at'=>current_time('mysql')),array('%s','%s','%s','%s','%f','%s','%s','%s'));if($wpdb->insert_id)$count++;}
+    public static function sync(){
+        $token=trim((string)get_option('smf_meta_access_token',''));$account=preg_replace('/^act_/','',trim((string)get_option('smf_meta_ad_account_id','')));if($token===''||$account==='')return new WP_Error('smf_missing_meta_credentials','Meta access token and Ad Account ID are required.');
+        $days=(int)get_option('smf_meta_sync_days',30);if(!in_array($days,array(7,30,90),true))$days=30;$until=current_time('Y-m-d');$since=wp_date('Y-m-d',strtotime('-'.($days-1).' days',current_time('timestamp')));
+        $url=add_query_arg(array('fields'=>'date_start,date_stop,campaign_id,adset_id,ad_id,spend','time_range'=>wp_json_encode(array('since'=>$since,'until'=>$until)),'level'=>'ad','limit'=>500,'access_token'=>$token),'https://graph.facebook.com/'.self::GRAPH_VERSION.'/act_'.rawurlencode($account).'/insights');$all=array();$pages=0;
+        while($url&&$pages<20){$res=wp_remote_get($url,array('timeout'=>30,'headers'=>array('Accept'=>'application/json')));if(is_wp_error($res))return $res;$code=wp_remote_retrieve_response_code($res);$body=json_decode(wp_remote_retrieve_body($res),true);if($code<200||$code>=300||!is_array($body))return new WP_Error('smf_meta_api_error',isset($body['error']['message'])?$body['error']['message']:'Meta Insights API request failed.',array('status'=>$code));if(!empty($body['data'])&&is_array($body['data']))$all=array_merge($all,$body['data']);$url=!empty($body['paging']['next'])?esc_url_raw($body['paging']['next']):'';$pages++;}
+        global $wpdb;$table=$wpdb->prefix.'smf_campaign_spend';$wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE source=%s AND spend_date BETWEEN %s AND %s",'meta_api',$since,$until));$count=0;
+        foreach($all as $row){$date=!empty($row['date_start'])?sanitize_text_field($row['date_start']):'';$amount=isset($row['spend'])?(float)$row['spend']:0;if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)||$amount<0)continue;$wpdb->insert($table,array('spend_date'=>$date,'campaign_id'=>!empty($row['campaign_id'])?sanitize_text_field($row['campaign_id']):'','adset_id'=>!empty($row['adset_id'])?sanitize_text_field($row['adset_id']):'','ad_id'=>!empty($row['ad_id'])?sanitize_text_field($row['ad_id']):'','amount'=>$amount,'currency'=>'BDT','source'=>'meta_api','created_at'=>current_time('mysql')),array('%s','%s','%s','%s','%f','%s','%s','%s'));if($wpdb->insert_id)$count++;}
         update_option('smf_meta_last_sync',current_time('mysql'),false);update_option('smf_meta_last_sync_count',$count,false);return $count;
     }
+    public static function page(){if(!current_user_can('manage_woocommerce'))return;$account=get_option('smf_meta_ad_account_id','');$days=(int)get_option('smf_meta_sync_days',30);$last=get_option('smf_meta_last_sync','');$count=(int)get_option('smf_meta_last_sync_count',0);$notice=get_transient('smf_meta_sync_notice');if($notice)delete_transient('smf_meta_sync_notice');?>
+    <div class="wrap smf-wrap smf-settings"><div class="smf-header"><div><h1>Meta Ads Sync</h1><p>Automatically import Meta Ads spend into Sync Meta Flow.</p></div><a class="button" href="<?php echo esc_url(admin_url('admin.php?page=smf-spend'));?>">← Ad Spend & ROAS</a></div>
+    <?php if($notice):?><div class="notice <?php echo $notice['status']==='error'?'notice-error':'notice-success';?> is-dismissible"><p><?php echo esc_html($notice['message']);?></p></div><?php endif;?>
+    <div class="smf-setup-grid"><div class="smf-panel"><h2>Automatic spend import</h2><form method="post" action="options.php"><?php settings_fields('smf_settings');?><p><label>Meta Ad Account ID<br><input class="smf-input" name="smf_meta_ad_account_id" value="<?php echo esc_attr($account);?>" placeholder="act_1234567890 or 1234567890"></label><small class="smf-help">Use the ad account that owns your campaigns. The CAPI token must also have permission to read Insights.</small></p><p><label>Sync history<br><select name="smf_meta_sync_days"><option value="7" <?php selected($days,7);?>>Last 7 days</option><option value="30" <?php selected($days,30);?>>Last 30 days</option><option value="90" <?php selected($days,90);?>>Last 90 days</option></select></label></p><?php submit_button('Save Sync Settings');?></form><hr><form method="post" action="<?php echo esc_url(admin_url('admin-post.php'));?>"><input type="hidden" name="action" value="smf_sync_meta_spend"><?php wp_nonce_field('smf_sync_meta_spend');?><button class="button button-primary" type="submit" <?php disabled(!$account||!get_option('smf_meta_access_token'));?>>Sync Meta Spend Now</button></form></div><div class="smf-panel"><div class="smf-big-icon">↻</div><h2>Sync status</h2><div class="smf-diagnostic-mini"><span>Ad Account</span><b><?php echo $account?'Configured':'Missing';?></b><span>Last sync</span><b><?php echo $last?esc_html($last):'Never';?></b><span>Rows imported</span><b><?php echo esc_html($count);?></b><span>Schedule</span><b>Every 6 hours</b></div><p class="smf-muted">API rows use the <code>meta_api</code> source, so manual spend entries are preserved.</p></div></div></div><?php }
 }
