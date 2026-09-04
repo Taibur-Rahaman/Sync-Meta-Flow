@@ -39,15 +39,21 @@ class SMF_Installer {
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             session_key varchar(64) NOT NULL,
             fbclid text DEFAULT NULL,
+            fbp varchar(255) DEFAULT NULL,
+            fbc varchar(255) DEFAULT NULL,
             utm_source varchar(255) DEFAULT NULL,
             utm_medium varchar(255) DEFAULT NULL,
             utm_campaign varchar(255) DEFAULT NULL,
             utm_content varchar(255) DEFAULT NULL,
             utm_term varchar(255) DEFAULT NULL,
+            utm_id varchar(255) DEFAULT NULL,
+            campaign_id varchar(255) DEFAULT NULL,
+            adset_id varchar(255) DEFAULT NULL,
+            ad_id varchar(255) DEFAULT NULL,
             landing_url text DEFAULT NULL,
             first_seen datetime NOT NULL,
             last_seen datetime NOT NULL,
-            PRIMARY KEY (id), UNIQUE KEY session_key (session_key), KEY fbclid (fbclid(255))
+            PRIMARY KEY (id), UNIQUE KEY session_key (session_key), KEY fbclid (fbclid(255)), KEY utm_campaign (utm_campaign(191))
         ) $charset;");
         dbDelta("CREATE TABLE $tracking (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
