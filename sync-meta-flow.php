@@ -2,16 +2,47 @@
 /**
  * Plugin Name: Sync Meta Flow
  * Plugin URI: https://github.com/Taibur-Rahaman/Sync-Meta-Flow
- * Description: Easy WooCommerce Meta tracking, first/last-touch attribution, order-flow, customer quality, ROAS and courier intelligence with no-code setup.
- * Version: 1.8.0
+ * Description: WooCommerce Meta revenue intelligence with first/last-touch attribution, order-flow, customer quality, ROAS, diagnostics and courier intelligence.
+ * Version: 2.0.0
  * Author: Taibur Rahaman
  * License: GPL-2.0-or-later
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
  */
-defined('ABSPATH')||exit;
-define('SMF_VERSION','1.8.0');define('SMF_FILE',__FILE__);define('SMF_DIR',plugin_dir_path(__FILE__));define('SMF_URL',plugin_dir_url(__FILE__));
-require_once SMF_DIR.'includes/class-smf-installer.php';require_once SMF_DIR.'includes/class-smf-attribution.php';require_once SMF_DIR.'includes/class-smf-tracker.php';require_once SMF_DIR.'includes/class-smf-order-events.php';require_once SMF_DIR.'includes/class-smf-order-status.php';require_once SMF_DIR.'includes/class-smf-meta-capi.php';require_once SMF_DIR.'includes/class-smf-spend.php';require_once SMF_DIR.'includes/class-smf-meta-insights.php';require_once SMF_DIR.'includes/class-smf-courier.php';require_once SMF_DIR.'includes/class-smf-courier-timeline.php';require_once SMF_DIR.'includes/class-smf-attribution-report.php';require_once SMF_DIR.'includes/class-smf-quality.php';require_once SMF_DIR.'includes/class-smf-admin.php';
-register_activation_hook(__FILE__,array('SMF_Installer','activate'));register_deactivation_hook(__FILE__,array('SMF_Installer','deactivate'));
-add_action('plugins_loaded',function(){SMF_Installer::maybe_upgrade();if(!class_exists('WooCommerce')){add_action('admin_notices',function(){if(!current_user_can('activate_plugins'))return;echo '<div class="notice notice-warning"><p><strong>Sync Meta Flow</strong> requires WooCommerce to be installed and active.</p></div>';});return;}SMF_Attribution::init();SMF_Tracker::init();SMF_Order_Status::init();SMF_Order_Events::init();SMF_Meta_CAPI::init();SMF_Spend::init();SMF_Meta_Insights::init();SMF_Courier::init();SMF_Courier_Timeline::init();SMF_Attribution_Report::init();SMF_Quality::init();SMF_Admin::init();});
+defined('ABSPATH') || exit;
+define('SMF_VERSION','2.0.0');
+define('SMF_FILE',__FILE__);
+define('SMF_DIR',plugin_dir_path(__FILE__));
+define('SMF_URL',plugin_dir_url(__FILE__));
+require_once SMF_DIR.'includes/class-smf-installer.php';
+require_once SMF_DIR.'includes/class-smf-attribution.php';
+require_once SMF_DIR.'includes/class-smf-tracker.php';
+require_once SMF_DIR.'includes/class-smf-order-events.php';
+require_once SMF_DIR.'includes/class-smf-order-status.php';
+require_once SMF_DIR.'includes/class-smf-meta-capi.php';
+require_once SMF_DIR.'includes/class-smf-spend.php';
+require_once SMF_DIR.'includes/class-smf-meta-insights.php';
+require_once SMF_DIR.'includes/class-smf-courier.php';
+require_once SMF_DIR.'includes/class-smf-courier-timeline.php';
+require_once SMF_DIR.'includes/class-smf-attribution-report.php';
+require_once SMF_DIR.'includes/class-smf-quality.php';
+require_once SMF_DIR.'includes/class-smf-diagnostics.php';
+require_once SMF_DIR.'includes/class-smf-admin.php';
+register_activation_hook(__FILE__,array('SMF_Installer','activate'));
+register_deactivation_hook(__FILE__,array('SMF_Installer','deactivate'));
+add_action('plugins_loaded',function(){
+    SMF_Installer::maybe_upgrade();
+    if(!class_exists('WooCommerce')){
+        add_action('admin_notices',function(){if(!current_user_can('activate_plugins'))return;echo '<div class="notice notice-warning"><p><strong>Sync Meta Flow</strong> requires WooCommerce to be installed and active.</p></div>';});
+        return;
+    }
+    SMF_Attribution::init(); SMF_Tracker::init(); SMF_Order_Status::init(); SMF_Order_Events::init();
+    SMF_Meta_CAPI::init(); SMF_Spend::init(); SMF_Meta_Insights::init(); SMF_Courier::init();
+    SMF_Courier_Timeline::init(); SMF_Attribution_Report::init(); SMF_Quality::init(); SMF_Diagnostics::init(); SMF_Admin::init();
+});
+add_action('admin_init',function(){
+    if(function_exists('wp_add_privacy_policy_content')){
+        wp_add_privacy_policy_content('Sync Meta Flow','<p>Sync Meta Flow stores attribution identifiers, tracking events, WooCommerce order-flow events and courier event data to measure advertising and delivery performance. Depending on configuration it may send hashed customer email/phone and Meta browser identifiers to Meta for Conversions API events. Courier integrations may send order delivery information to the selected courier. Review your Meta, courier and site privacy policies before enabling these integrations.</p>');
+    }
+});
