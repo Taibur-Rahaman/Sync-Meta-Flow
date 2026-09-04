@@ -72,6 +72,10 @@ class SMF_Courier_State {
 
     public static function guard_webhook_state($result, $server, $request) {
         if ((string) $request->get_route() !== self::ROUTE || strtoupper($request->get_method()) !== 'POST') return $result;
+        // Preserve an earlier REST response, notably timeline dedupe/lock responses.
+        if ($result instanceof WP_REST_Response || is_wp_error($result)) return $result;
+        // This guard must never make decisions about an unauthenticated webhook.
+        if (class_exists('SMF_Courier_Timeline') && !SMF_Courier_Timeline::webhook_signature_valid($request)) return $result;
         $data = json_decode($request->get_body(), true);
         if (!is_array($data)) return $result;
         $target = self::normalize(isset($data['status']) ? $data['status'] : (isset($data['delivery_status']) ? $data['delivery_status'] : ''));
