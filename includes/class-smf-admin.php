@@ -17,7 +17,7 @@ class SMF_Admin {
     public static function settings() {
         register_setting('smf_settings', 'smf_meta_enabled', array('sanitize_callback' => function($v){ return $v === 'yes' ? 'yes' : 'no'; }));
         register_setting('smf_settings', 'smf_meta_pixel_id', 'sanitize_text_field');
-        register_setting('smf_settings', 'smf_meta_access_token', 'sanitize_text_field');
+        register_setting('smf_settings', 'smf_meta_access_token', array('sanitize_callback' => function($v){ $v = trim((string) $v); return $v !== '' ? sanitize_text_field($v) : get_option('smf_meta_access_token', ''); }));
     }
 
     public static function assets($hook) {
@@ -64,7 +64,7 @@ class SMF_Admin {
                     <div class="smf-panel smf-main-setup">
                         <div class="smf-step"><span>1</span><div><h2>Enable tracking</h2><p>No code or theme changes required.</p><label class="smf-toggle"><input type="checkbox" name="smf_meta_enabled" value="yes" <?php checked($enabled); ?>><i></i><b><?php echo $enabled ? 'Tracking enabled' : 'Enable tracking'; ?></b></label></div></div>
                         <div class="smf-step"><span>2</span><div><h2>Connect your Meta Pixel</h2><p>Paste the Pixel ID from Meta Events Manager.</p><input class="smf-input" name="smf_meta_pixel_id" value="<?php echo esc_attr($pixel); ?>" placeholder="Example: 123456789012345"><small class="smf-help">Meta Events Manager → Data Sources → your Pixel.</small></div></div>
-                        <div class="smf-step"><span>3</span><div><h2>Conversions API <em>Optional</em></h2><p>Add an access token for server-side events. The token is never shown in the diagnostics.</p><input type="password" class="smf-input" name="smf_meta_access_token" value="" placeholder="<?php echo $token ? 'Saved access token — leave blank to keep it' : 'Meta access token'; ?>" autocomplete="new-password"><small class="smf-help"><?php echo $token ? 'A token is already saved. Leave this field blank to keep it unchanged.' : 'Create a token in Meta Events Manager and paste it here.'; ?></small></div></div>
+                        <div class="smf-step"><span>3</span><div><h2>Conversions API <em>Optional</em></h2><p>Add an access token for server-side events. The saved token stays hidden.</p><input type="password" class="smf-input" name="smf_meta_access_token" value="" placeholder="<?php echo $token ? 'Saved access token — leave blank to keep it' : 'Meta access token'; ?>" autocomplete="new-password"><small class="smf-help"><?php echo $token ? 'A token is already saved. Leave this field blank to keep it unchanged.' : 'Create a token in Meta Events Manager and paste it here.'; ?></small></div></div>
                         <div class="smf-events"><h2>Tracked automatically</h2><div class="smf-event-grid"><?php foreach (array('PageView','ViewContent','AddToCart','InitiateCheckout','Purchase','Confirmed','Shipped','Delivered','Cancelled','Returned') as $event): ?><span>✓ <?php echo esc_html($event); ?></span><?php endforeach; ?></div></div>
                         <?php submit_button('Save & Enable'); ?>
                     </div>
