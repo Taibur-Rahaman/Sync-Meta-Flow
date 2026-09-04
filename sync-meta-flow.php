@@ -3,7 +3,7 @@
  * Plugin Name: Sync Meta Flow
  * Plugin URI: https://github.com/Taibur-Rahaman/Sync-Meta-Flow
  * Description: Easy WooCommerce Meta tracking, attribution and order-flow tracking with a no-code setup.
- * Version: 0.5.0
+ * Version: 0.7.0
  * Author: Taibur Rahaman
  * License: GPL-2.0-or-later
  * Requires at least: 6.4
@@ -13,7 +13,7 @@
 
 defined('ABSPATH') || exit;
 
-define('SMF_VERSION', '0.5.0');
+define('SMF_VERSION', '0.7.0');
 define('SMF_FILE', __FILE__);
 define('SMF_DIR', plugin_dir_path(__FILE__));
 define('SMF_URL', plugin_dir_url(__FILE__));
