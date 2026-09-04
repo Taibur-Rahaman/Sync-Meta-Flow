@@ -3,46 +3,34 @@ defined('ABSPATH') || exit;
 class SMF_Courier_Recovery {
     const CRON='smf_retry_courier_events';
     public static function init() {
+        add_filter('cron_schedules', array(__CLASS__, 'schedules'));
         add_action('admin_menu', array(__CLASS__, 'menu'));
         add_action('admin_post_smf_retry_courier_event', array(__CLASS__, 'retry'));
         add_action(self::CRON, array(__CLASS__, 'process_retries'));
-        if (!wp_next_scheduled(self::CRON)) wp_schedule_event(time()+300, 'hourly', self::CRON);
+        if (!wp_next_scheduled(self::CRON)) wp_schedule_event(time()+300, 'smf_five_minutes', self::CRON);
     }
+    public static function schedules($schedules) { $schedules['smf_five_minutes']=array('interval'=>300,'display'=>'Every 5 minutes'); return $schedules; }
     public static function menu() { add_submenu_page('sync-meta-flow', 'Courier Recovery', 'Courier Recovery', 'manage_woocommerce', 'smf-courier-recovery', array(__CLASS__, 'page')); }
     private static function table() { global $wpdb; return $wpdb->prefix . SMF_Courier_Timeline::TABLE_SUFFIX; }
     private static function failed_events() { global $wpdb; SMF_Courier_Timeline::ensure_table(); return $wpdb->get_results("SELECT id,provider,event_id,order_id,status,response_code,result,attempts,last_error,next_retry_at,received_at,processed_at,payload FROM " . self::table() . " WHERE result='failed' ORDER BY received_at DESC,id DESC LIMIT 50"); }
     private static function claim_manual($id) { global $wpdb; SMF_Courier_Timeline::ensure_table(); return (bool)$wpdb->query($wpdb->prepare("UPDATE ".self::table()." SET result='received',next_retry_at=NULL,processed_at=NULL WHERE id=%d AND result='failed' AND attempts<%d",absint($id),SMF_Courier_Timeline::MAX_ATTEMPTS)); }
     private static function replay($row) {
-        $secret = trim((string)get_option('smf_courier_webhook_secret', ''));
-        if ($secret === '') { SMF_Courier_Timeline::record_retry_failure($row->id, 'replay_blocked: courier webhook secret is not configured.'); return new WP_Error('smf_missing_webhook_secret','Courier webhook secret is required for safe replay.'); }
-        $payload=(string)$row->payload;
-        $signature=hash_hmac('sha256',$payload,$secret);
-        $url=rest_url(SMF_Courier::NS . SMF_Courier::ROUTE);
+        $secret=trim((string)get_option('smf_courier_webhook_secret',''));
+        if($secret===''){SMF_Courier_Timeline::record_retry_failure($row->id,'replay_blocked: courier webhook secret is not configured.');return new WP_Error('smf_missing_webhook_secret','Courier webhook secret is required for safe replay.');}
+        $payload=(string)$row->payload;$signature=hash_hmac('sha256',$payload,$secret);$url=rest_url(SMF_Courier::NS . SMF_Courier::ROUTE);
         $response=wp_remote_post($url,array('timeout'=>20,'headers'=>array('Content-Type'=>'application/json','X-SMF-Signature'=>$signature,'X-SMF-Event-ID'=>(string)$row->event_id),'body'=>$payload));
         if(is_wp_error($response)){SMF_Courier_Timeline::record_retry_failure($row->id,'replay_wp_error: '.implode('; ',array_map('strval',$response->get_error_messages())));return $response;}
         return $response;
     }
     public static function retry() {
-        if (!current_user_can('manage_woocommerce')) wp_die('Unauthorized');
-        $id=isset($_POST['event_id'])?absint($_POST['event_id']):0;
-        check_admin_referer('smf_retry_courier_event_'.$id);
-        SMF_Courier_Timeline::ensure_table(); global $wpdb;
-        $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.self::table().' WHERE id=%d AND result=\'failed\' LIMIT 1',$id));
-        if(!$row||empty($row->payload))wp_die('Failed courier event was not found or has no replayable payload.');
-        if(!self::claim_manual($id))wp_die('Courier event is already being retried, processed, or has exhausted its retry limit.');
-        $response=self::replay($row);
-        $code=is_wp_error($response)?0:(int)wp_remote_retrieve_response_code($response);
-        wp_safe_redirect(add_query_arg(array('page'=>'smf-courier-recovery','retried'=>$id,'code'=>$code),admin_url('admin.php'))); exit;
+        if(!current_user_can('manage_woocommerce'))wp_die('Unauthorized');$id=isset($_POST['event_id'])?absint($_POST['event_id']):0;check_admin_referer('smf_retry_courier_event_'.$id);SMF_Courier_Timeline::ensure_table();global $wpdb;
+        $row=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.self::table().' WHERE id=%d AND result=\'failed\' LIMIT 1',$id));if(!$row||empty($row->payload))wp_die('Failed courier event was not found or has no replayable payload.');if(!self::claim_manual($id))wp_die('Courier event is already being retried, processed, or has exhausted its retry limit.');
+        $response=self::replay($row);$code=is_wp_error($response)?0:(int)wp_remote_retrieve_response_code($response);wp_safe_redirect(add_query_arg(array('page'=>'smf-courier-recovery','retried'=>$id,'code'=>$code),admin_url('admin.php')));exit;
     }
-    public static function process_retries() {
-        if (!class_exists('SMF_Courier_Timeline')) return;
-        $events=SMF_Courier_Timeline::get_retryable_events(10);
-        foreach($events as $row){if(!SMF_Courier_Timeline::claim_retry($row->id))continue;self::replay($row);}
-    }
+    public static function process_retries() { if(!class_exists('SMF_Courier_Timeline'))return;$events=SMF_Courier_Timeline::get_retryable_events(10);foreach($events as $row){if(!SMF_Courier_Timeline::claim_retry($row->id))continue;self::replay($row);} }
     public static function page() {
-        if (!current_user_can('manage_woocommerce')) return;
-        $events=self::failed_events();$health=SMF_Courier_Timeline::health();
-        echo '<div class="wrap"><h1>Courier Recovery</h1><p>Failed webhook events are retained for inspection and safe signed replay. Automatic retries use bounded exponential backoff and stop after '.esc_html(SMF_Courier_Timeline::MAX_ATTEMPTS).' attempts.</p>';
+        if(!current_user_can('manage_woocommerce'))return;$events=self::failed_events();$health=SMF_Courier_Timeline::health();
+        echo '<div class="wrap"><h1>Courier Recovery</h1><p>Failed webhook events are retained for inspection and safe signed replay. Automatic retries run every five minutes, use bounded exponential backoff, and stop after '.esc_html(SMF_Courier_Timeline::MAX_ATTEMPTS).' attempts.</p>';
         echo '<div class="notice notice-info"><p><strong>Health:</strong> Failed '.esc_html($health['failed']).' · Retryable '.esc_html($health['retryable']).' · Processing '.esc_html($health['processing']).' · Exhausted '.esc_html($health['exhausted']).'</p></div>';
         if(isset($_GET['retried']))echo '<div class="notice notice-info"><p>Replay attempted. HTTP response: '.esc_html(absint($_GET['code'])).'.</p></div>';
         if(!$events){echo '<div class="notice notice-success"><p>No failed courier webhook events.</p></div></div>';return;}
