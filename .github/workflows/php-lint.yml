@@ -52,6 +52,9 @@ jobs:
       - name: Courier recovery reliability tests
         if: matrix.php-version == '8.3'
         run: php tests/test-courier-recovery-reliability.php
+      - name: Courier provider intelligence tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-provider-intelligence.php
       - name: CAPI idempotency tests
         if: matrix.php-version == '8.3'
         run: php tests/test-capi-idempotency.php
