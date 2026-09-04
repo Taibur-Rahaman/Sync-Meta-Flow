@@ -8,6 +8,8 @@ class SMF_Installer {
         add_option('smf_meta_enabled','no'); add_option('smf_attribution_model','last_touch');
         add_option('smf_delete_data_on_uninstall','no'); add_option('smf_courier_provider','generic');
         add_option('smf_courier_risk_window',90);
+        add_option('smf_cogs_percent',0); add_option('smf_payment_fee_percent',0);
+        add_option('smf_courier_delivery_cost',0); add_option('smf_courier_return_cost',0);
     }
     private static function create_tables(){global $wpdb;require_once ABSPATH.'wp-admin/includes/upgrade.php';$charset=$wpdb->get_charset_collate();$events=$wpdb->prefix.'smf_order_events';$sessions=$wpdb->prefix.'smf_tracking_sessions';$tracking=$wpdb->prefix.'smf_tracking_events';$queue=$wpdb->prefix.'smf_capi_queue';$spend=$wpdb->prefix.'smf_campaign_spend';$courier=$wpdb->prefix.'smf_courier_events';
         dbDelta("CREATE TABLE $events (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,order_id bigint(20) unsigned NOT NULL,event_type varchar(64) NOT NULL,old_status varchar(32) DEFAULT NULL,new_status varchar(32) DEFAULT NULL,source varchar(64) DEFAULT NULL,metadata longtext DEFAULT NULL,created_at datetime NOT NULL,PRIMARY KEY(id),KEY order_id(order_id),KEY event_type(event_type),KEY event_created(event_type,created_at),KEY created_at(created_at)) $charset;");
