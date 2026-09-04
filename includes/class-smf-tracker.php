@@ -12,6 +12,9 @@ class SMF_Tracker {
         if (is_admin()) return;
         $order_id = self::get_received_order_id();
         $order = $order_id ? wc_get_order($order_id) : false;
+        $purchase_id = $order ? $order->get_meta('_smf_purchase_event_id') : '';
+        $fbc = self::get_fbc_cookie();
+        $fbp = isset($_COOKIE['_fbp']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbp'])) : '';
         wp_enqueue_script('smf-tracker', SMF_URL . 'assets/js/tracker.js', array('jquery'), SMF_VERSION, true);
         wp_localize_script('smf-tracker', 'SMF_DATA', array(
             'ajaxUrl' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('smf_track'),
@@ -19,14 +22,16 @@ class SMF_Tracker {
             'productId' => function_exists('is_product') && is_product() ? get_the_ID() : 0,
             'productName' => function_exists('is_product') && is_product() ? get_the_title() : '',
             'isProduct' => function_exists('is_product') && is_product(),
-            'isCheckout' => function_exists('is_checkout') && is_checkout(),
+            'isCheckout' => function_exists('is_checkout') && is_checkout() && !function_exists('is_order_received_page') || (function_exists('is_checkout') && is_checkout() && !is_order_received_page()),
             'isCart' => function_exists('is_cart') && is_cart(),
             'isOrderReceived' => (bool) $order,
             'orderId' => $order ? $order->get_id() : 0,
             'orderTotal' => $order ? (float) $order->get_total() : 0,
-            'purchaseEventId' => $order ? $order->get_meta('_smf_purchase_event_id') : '',
+            'purchaseEventId' => $purchase_id,
             'currency' => $order ? $order->get_currency() : (function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : ''),
             'metaPixelId' => self::meta_enabled() ? preg_replace('/[^0-9]/', '', (string) get_option('smf_meta_pixel_id', '')) : '',
+            'fbp' => $fbp,
+            'fbc' => $fbc,
         ));
     }
 
@@ -58,6 +63,15 @@ class SMF_Tracker {
         $values = array();
         foreach (array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term') as $key) if (isset($_GET[$key])) $values[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
         echo '<script>window.SMF_ATTRIBUTION=' . wp_json_encode($values) . ';</script>';
+    }
+
+    private static function get_fbc_cookie() {
+        if (isset($_COOKIE['smf_fbc'])) {
+            $value = sanitize_text_field(wp_unslash($_COOKIE['smf_fbc']));
+            if (strpos($value, 'fb.1.') === 0) return $value;
+        }
+        if (!empty($_GET['fbclid'])) return 'fb.1.' . round(microtime(true) * 1000) . '.' . sanitize_text_field(wp_unslash($_GET['fbclid']));
+        return '';
     }
 
     public static function get_or_create_session() {
