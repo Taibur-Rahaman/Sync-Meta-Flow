@@ -37,6 +37,9 @@ jobs:
       - name: Courier shipment hardening tests
         if: matrix.php-version == '8.3'
         run: php tests/test-courier-operations-hardening.php
+      - name: Courier atomic lock tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-lock-atomic.php
       - name: Courier replay tests
         if: matrix.php-version == '8.3'
         run: php tests/test-courier-replay.php
