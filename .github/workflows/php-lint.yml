@@ -25,3 +25,6 @@ jobs:
       - name: Attribution behavioral tests
         if: matrix.php-version == '8.3'
         run: php tests/test-attribution-model.php
+      - name: Courier behavioral tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-operations.php
