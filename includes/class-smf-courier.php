@@ -5,6 +5,7 @@ class SMF_Courier {
     const NS = 'sync-meta-flow/v1';
     const ROUTE = '/courier/webhook';
     const STEADFAST_BASE = 'https://portal.packzy.com/api/v1';
+    const SHIPMENT_LOCK_TTL = 120;
 
     public static function init() {
         add_action('rest_api_init', array(__CLASS__, 'routes'));
@@ -102,39 +103,63 @@ class SMF_Courier {
         return $json;
     }
 
+    private static function shipment_lock_key($order_id) { return 'smf_shipment_lock_'.absint($order_id); }
+
+    private static function acquire_shipment_lock($order_id) {
+        $key = self::shipment_lock_key($order_id);
+        $token = wp_generate_uuid4();
+        if (get_transient($key)) return false;
+        set_transient($key, $token, self::SHIPMENT_LOCK_TTL);
+        return get_transient($key) === $token ? $token : false;
+    }
+
+    private static function release_shipment_lock($order_id, $token) {
+        $key = self::shipment_lock_key($order_id);
+        if ($token && get_transient($key) === $token) delete_transient($key);
+    }
+
     private static function create_steadfast_order($order) {
         $existing_consignment = trim((string)$order->get_meta('_smf_courier_consignment_id'));
         if ($existing_consignment !== '') return new WP_Error('smf_shipment_exists','A courier shipment already exists for this order.');
-        $items = $order->get_items(); $names=array(); foreach ($items as $item) $names[]=$item->get_name().' x'.$item->get_quantity();
-        $payload=array(
-            'invoice'=>'SMF-'.$order->get_id(),
-            'recipient_name'=>$order->get_formatted_billing_full_name() ?: $order->get_shipping_first_name().' '.$order->get_shipping_last_name(),
-            'recipient_phone'=>$order->get_billing_phone(),
-            'recipient_address'=>trim($order->get_billing_address_1().' '.$order->get_billing_address_2().' '.$order->get_billing_city().' '.$order->get_billing_state()),
-            'cod_amount'=>(float)$order->get_total(),
-            'note'=>substr(wp_strip_all_tags($order->get_customer_note()),0,480),
-            'item_description'=>substr(implode(', ',$names),0,500),
-            'total_lot'=>max(1,count($items)),
-            'delivery_type'=>0
-        );
-        $result=self::steadfast_request('POST','/create_order',$payload);
-        if (is_wp_error($result)) return $result;
-        if (empty($result['consignment'])) return new WP_Error('smf_courier_create_failed','Courier did not return a consignment.');
-        $cons=$result['consignment'];
-        $order->update_meta_data('_smf_courier_provider','steadfast');
-        $order->update_meta_data('_smf_courier_invoice',$payload['invoice']);
-        if (!empty($cons['consignment_id'])) $order->update_meta_data('_smf_courier_consignment_id',sanitize_text_field((string)$cons['consignment_id']));
-        if (!empty($cons['tracking_code'])) { $order->update_meta_data('_smf_tracking_number',sanitize_text_field($cons['tracking_code'])); $order->update_meta_data('_smf_courier_tracking_code',sanitize_text_field($cons['tracking_code'])); }
-        if (isset($cons['cod_amount'])) $order->update_meta_data('_smf_courier_cod_amount',wc_format_decimal($cons['cod_amount']));
-        $order->update_meta_data('_smf_courier_last_status',sanitize_key(isset($cons['status'])?$cons['status']:'in_review'));
-        $order->update_meta_data('_smf_courier_created_at',current_time('mysql')); $order->save();
-        if ($order->get_status()==='pending' || $order->get_status()==='on-hold') $order->update_status('smf-confirmed','Sync Meta Flow: shipment created with Steadfast.',true);
-        return $cons;
+        $lock = self::acquire_shipment_lock($order->get_id());
+        if (!$lock) return new WP_Error('smf_shipment_in_progress','Shipment creation is already in progress for this order. Please wait and refresh.');
+        try {
+            $existing_consignment = trim((string)$order->get_meta('_smf_courier_consignment_id'));
+            if ($existing_consignment !== '') return new WP_Error('smf_shipment_exists','A courier shipment already exists for this order.');
+            $items = $order->get_items(); $names=array(); foreach ($items as $item) $names[]=$item->get_name().' x'.$item->get_quantity();
+            $payload=array(
+                'invoice'=>'SMF-'.$order->get_id(),
+                'recipient_name'=>$order->get_formatted_billing_full_name() ?: $order->get_shipping_first_name().' '.$order->get_shipping_last_name(),
+                'recipient_phone'=>$order->get_billing_phone(),
+                'recipient_address'=>trim($order->get_billing_address_1().' '.$order->get_billing_address_2().' '.$order->get_billing_city().' '.$order->get_billing_state()),
+                'cod_amount'=>(float)$order->get_total(),
+                'note'=>substr(wp_strip_all_tags($order->get_customer_note()),0,480),
+                'item_description'=>substr(implode(', ',$names),0,500),
+                'total_lot'=>max(1,count($items)),
+                'delivery_type'=>0
+            );
+            $result=self::steadfast_request('POST','/create_order',$payload);
+            if (is_wp_error($result)) return $result;
+            if (empty($result['consignment'])) return new WP_Error('smf_courier_create_failed','Courier did not return a consignment.');
+            $cons=$result['consignment'];
+            $order->update_meta_data('_smf_courier_provider','steadfast');
+            $order->update_meta_data('_smf_courier_invoice',$payload['invoice']);
+            if (!empty($cons['consignment_id'])) $order->update_meta_data('_smf_courier_consignment_id',sanitize_text_field((string)$cons['consignment_id']));
+            if (!empty($cons['tracking_code'])) { $order->update_meta_data('_smf_tracking_number',sanitize_text_field((string)$cons['tracking_code'])); $order->update_meta_data('_smf_courier_tracking_code',sanitize_text_field((string)$cons['tracking_code'])); }
+            if (isset($cons['cod_amount'])) $order->update_meta_data('_smf_courier_cod_amount',wc_format_decimal($cons['cod_amount']));
+            $order->update_meta_data('_smf_courier_last_status',sanitize_key(isset($cons['status'])?$cons['status']:'in_review'));
+            $order->update_meta_data('_smf_courier_created_at',current_time('mysql')); $order->save();
+            if ($order->get_status()==='pending' || $order->get_status()==='on-hold') $order->update_status('smf-confirmed','Sync Meta Flow: shipment created with Steadfast.',true);
+            return $cons;
+        } finally {
+            self::release_shipment_lock($order->get_id(), $lock);
+        }
     }
 
     public static function create_shipment() {
         if (!current_user_can('manage_woocommerce')) wp_die('Unauthorized');
-        $order_id=isset($_GET['order_id'])?absint($_GET['order_id']):0; check_admin_referer('smf_create_shipment_'.$order_id);
+        if (strtoupper((string)$_SERVER['REQUEST_METHOD']) !== 'POST') wp_die('Shipment creation requires POST.');
+        $order_id=isset($_POST['order_id'])?absint($_POST['order_id']):0; check_admin_referer('smf_create_shipment_'.$order_id);
         $order=wc_get_order($order_id); if (!$order) wp_die('Order not found.');
         if (self::provider()!=='steadfast') wp_die('Native shipment creation is currently available for Steadfast. Pathao and RedX require their merchant API credentials/adapter configuration.');
         $result=self::create_steadfast_order($order);
@@ -146,7 +171,7 @@ class SMF_Courier {
         if (!current_user_can('manage_woocommerce')) return;
         $provider=self::provider(); $tracking=(string)$order->get_meta('_smf_tracking_number'); $consignment=(string)$order->get_meta('_smf_courier_consignment_id');
         echo '<div style="margin-top:20px;padding:12px;border:1px solid #ddd;background:#fff"><strong>Sync Meta Flow Courier</strong>';
-        if ($provider==='steadfast' && !$consignment) { $url=wp_nonce_url(admin_url('admin-post.php?action=smf_create_shipment&order_id='.$order->get_id()),'smf_create_shipment_'.$order->get_id()); echo '<p><a class="button button-primary" href="'.esc_url($url).'">Create Steadfast Shipment</a></p>'; }
+        if ($provider==='steadfast' && !$consignment) { echo '<form method="post" action="'.esc_url(admin_url('admin-post.php')).'"><input type="hidden" name="action" value="smf_create_shipment"><input type="hidden" name="order_id" value="'.esc_attr($order->get_id()).'">'.wp_nonce_field('smf_create_shipment_'.$order->get_id(),'_wpnonce',true,false).'<p><button class="button button-primary" type="submit">Create Steadfast Shipment</button></p></form>'; }
         if ($consignment || $tracking) echo '<p><strong>Tracking:</strong> '.esc_html($tracking?:$consignment).'</p>';
         echo '<p class="description">Provider: '.esc_html($provider).'</p></div>';
     }
@@ -167,6 +192,6 @@ class SMF_Courier {
         if (!current_user_can('manage_woocommerce')) return;
         $secret=self::secret(); $provider=self::provider(); $endpoint=rest_url(self::NS.self::ROUTE); $key=(string)get_option('smf_steadfast_api_key',''); $skey=(string)get_option('smf_steadfast_secret_key',''); ?>
         <div class="wrap smf-wrap smf-settings"><div class="smf-header"><div><h1>Courier & Delivery <span style="font-size:12px">v1.4</span></h1><p>Native shipment creation for Steadfast plus a normalized webhook bridge for Pathao, Steadfast and RedX.</p></div><a class="button" href="<?php echo esc_url(admin_url('admin.php?page=sync-meta-flow')); ?>">← Dashboard</a></div>
-        <div class="smf-setup-grid"><div class="smf-panel"><h2>Provider setup</h2><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="smf_save_courier"><?php wp_nonce_field('smf_save_courier'); ?><p><label>Provider<br><select name="provider"><option value="generic" <?php selected($provider,'generic'); ?>>Generic webhook</option><option value="pathao" <?php selected($provider,'pathao'); ?>>Pathao</option><option value="steadfast" <?php selected($provider,'steadfast'); ?>>Steadfast</option><option value="redx" <?php selected($provider,'redx'); ?>>RedX</option></select></label></p><p><label>Webhook secret<br><input class="smf-input" type="password" name="webhook_secret" value="<?php echo esc_attr($secret); ?>" autocomplete="new-password"></label></p><hr><h3>Steadfast API</h3><p><label>API Key<br><input class="smf-input" type="password" name="steadfast_api_key" value="<?php echo esc_attr($key); ?>" autocomplete="new-password"></label></p><p><label>Secret Key<br><input class="smf-input" type="password" name="steadfast_secret_key" value="<?php echo esc_attr($skey); ?>" autocomplete="new-password"></label></p><?php submit_button('Save Courier Settings'); ?></form></div><div class="smf-panel"><h2>Webhook bridge</h2><p class="smf-muted">Use the endpoint for provider webhooks that you normalize to Sync Meta Flow.</p><p><label>Endpoint<br><input class="smf-input" readonly value="<?php echo esc_attr($endpoint); ?>"></label></p><pre><code>{"order_id":1234,"status":"delivered","tracking_number":"ABC123","provider":"steadfast","cod_amount":1500,"delivery_fee":70}</code></pre><p class="smf-muted">Header: <code>X-SMF-Signature: sha256=&lt;HMAC&gt;</code></p><p><strong>Flow:</strong> Confirmed → Shipped → Delivered → Returned / Cancelled.</p><p><strong>Steadfast:</strong> Create shipment from the WooCommerce order page. Tracking and courier metadata are saved automatically.</p><p><strong>Pathao / RedX:</strong> provider presets and webhook normalization are available; native creation is intentionally gated until merchant API credentials/endpoints are configured.</p></div></div></div><?php
-    }
+        <div class="smf-setup-grid"><div class="smf-panel"><h2>Provider setup</h2><form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>"><input type="hidden" name="action" value="smf_save_courier"><?php wp_nonce_field('smf_save_courier'); ?><p><label>Provider<br><select name="provider"><option value="generic" <?php selected($provider,'generic'); ?>>Generic webhook</option><option value="pathao" <?php selected($provider,'pathao'); ?>>Pathao</option><option value="steadfast" <?php selected($provider,'steadfast'); ?>>Steadfast</option><option value="redx" <?php selected($provider,'redx'); ?>>RedX</option></select></label></p><p><label>Webhook secret<br><input class="smf-input" type="password" name="webhook_secret" value="<?php echo esc_attr($secret); ?>" autocomplete="new-password"></label></p><hr><h3>Steadfast API</h3><p><label>API Key<br><input class="smf-input" type="password" name="steadfast_api_key" value="<?php echo esc_attr($key); ?>" autocomplete="new-password"></label></p><p><label>Secret Key<br><input class="smf-input" type="password" name="steadfast_secret_key" value="<?php echo esc_attr($skey); ?>" autocomplete="new-password"></label></p><?php submit_button('Save Courier Settings'); ?></form></div><div class="smf-panel"><h2>Webhook bridge</h2><p class="smf-muted">Use the endpoint for provider webhooks that you normalize to Sync Meta Flow.</p><p><label>Endpoint<br><input class="smf-input" readonly value="<?php echo esc_attr($endpoint); ?>"></label></p><pre><code>{"order_id":1234,"status":"delivered","tracking_number":"ABC123","provider":"steadfast","cod_amount":1500,"delivery_fee":70}</code></pre></div></div></div>
+        <?php }
 }
