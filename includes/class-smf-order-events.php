@@ -23,15 +23,36 @@ class SMF_Order_Events {
         $event = isset($_POST['event']) ? sanitize_key(wp_unslash($_POST['event'])) : '';
         $allowed = array('page_view', 'view_content', 'add_to_cart', 'initiate_checkout');
         if (!in_array($event, $allowed, true)) wp_send_json_error(array('message' => 'Invalid event'), 400);
-        wp_send_json_success();
+
+        $session = isset($_COOKIE['smf_session']) ? sanitize_text_field(wp_unslash($_COOKIE['smf_session'])) : '';
+        if (!$session) $session = SMF_Tracker::save_session(array());
+
+        $payload = array();
+        if (isset($_POST['payload'])) {
+            $decoded = json_decode(wp_unslash($_POST['payload']), true);
+            if (is_array($decoded)) $payload = array_slice($decoded, 0, 20, true);
+        }
+        $event_id = isset($payload['event_id']) ? sanitize_text_field($payload['event_id']) : wp_generate_uuid4();
+        $page_url = isset($payload['page_url']) ? esc_url_raw($payload['page_url']) : '';
+
+        global $wpdb;
+        $wpdb->insert($wpdb->prefix . 'smf_tracking_events', array(
+            'session_key' => $session,
+            'event_name' => $event,
+            'event_id' => $event_id,
+            'page_url' => $page_url,
+            'payload' => wp_json_encode($payload),
+            'created_at' => current_time('mysql'),
+        ));
+        wp_send_json_success(array('event_id' => $event_id));
     }
 
     private static function attach_attribution($order) {
         if (!empty($_COOKIE['smf_attribution'])) {
             $raw = json_decode(wp_unslash($_COOKIE['smf_attribution']), true);
             if (is_array($raw)) {
+                $allowed = array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term');
                 foreach ($raw as $key => $value) {
-                    $allowed = array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term');
                     if (in_array($key, $allowed, true)) update_post_meta($order->get_id(), '_smf_' . $key, sanitize_text_field($value));
                 }
             }
