@@ -58,6 +58,9 @@ jobs:
       - name: Courier delivery and financial intelligence tests
         if: matrix.php-version == '8.3'
         run: php tests/test-courier-delivery-financial.php
+      - name: Profitability intelligence tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-profitability-intelligence.php
       - name: CAPI idempotency tests
         if: matrix.php-version == '8.3'
         run: php tests/test-capi-idempotency.php
