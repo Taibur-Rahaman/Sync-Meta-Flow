@@ -26,9 +26,11 @@
   }
   function metaTrack(name, payload, id) {
     if (typeof window.fbq !== 'function' || !data.metaPixelId) return;
-    var params = payload || {};
-    if (id) params.eventID = id;
-    window.fbq('track', name, params, id ? {eventID: id} : undefined);
+    var params = Object.assign({}, payload || {});
+    delete params.session_key;
+    delete params.page_url;
+    delete params.event_id;
+    window.fbq('track', name, params, id ? { eventID: id } : undefined);
   }
   function track(eventName, payload, metaName) {
     payload = payload || {};
@@ -61,4 +63,15 @@
     jQuery(document.body).on('checkout_error', function () { track('checkout_error'); });
   }
   if (data.isCheckout) track('initiate_checkout', {}, 'InitiateCheckout');
+
+  // Purchase is fired on the WooCommerce order-received page with the same event ID
+  // saved on the order. That ID can be reused by server-side CAPI for deduplication.
+  if (data.isOrderReceived && data.purchaseEventId) {
+    var purchasePayload = {
+      value: Number(data.orderTotal || 0),
+      currency: data.currency || '',
+      order_id: String(data.orderId || '')
+    };
+    track('purchase', purchasePayload, 'Purchase');
+  }
 })();
