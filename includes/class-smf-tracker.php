@@ -9,10 +9,13 @@ class SMF_Tracker {
 
     public static function enqueue() {
         if (is_admin()) return;
-        wp_enqueue_script('smf-tracker', SMF_URL . 'assets/js/tracker.js', array(), SMF_VERSION, true);
+        wp_enqueue_script('smf-tracker', SMF_URL . 'assets/js/tracker.js', array('jquery'), SMF_VERSION, true);
         wp_localize_script('smf-tracker', 'SMF_DATA', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('smf_track'),
+            'productId' => function_exists('is_product') && is_product() ? get_the_ID() : 0,
+            'isProduct' => function_exists('is_product') && is_product(),
+            'isCheckout' => function_exists('is_checkout') && is_checkout(),
         ));
     }
 
@@ -23,8 +26,7 @@ class SMF_Tracker {
         foreach ($allowed as $key) {
             if (isset($_GET[$key])) $values[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
         }
-        if (!$values) return;
-        echo '<script>window.SMF_ATTRIBUTION=' . wp_json_encode($values) . ';</script>';
+        if ($values) echo '<script>window.SMF_ATTRIBUTION=' . wp_json_encode($values) . ';</script>';
     }
 
     public static function save_session($data) {
@@ -32,18 +34,10 @@ class SMF_Tracker {
         $table = $wpdb->prefix . 'smf_tracking_sessions';
         $key = wp_generate_uuid4();
         $now = current_time('mysql');
-        $wpdb->insert($table, array(
-            'session_key' => $key,
-            'fbclid' => isset($data['fbclid']) ? $data['fbclid'] : null,
-            'utm_source' => isset($data['utm_source']) ? $data['utm_source'] : null,
-            'utm_medium' => isset($data['utm_medium']) ? $data['utm_medium'] : null,
-            'utm_campaign' => isset($data['utm_campaign']) ? $data['utm_campaign'] : null,
-            'utm_content' => isset($data['utm_content']) ? $data['utm_content'] : null,
-            'utm_term' => isset($data['utm_term']) ? $data['utm_term'] : null,
-            'landing_url' => isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : null,
-            'first_seen' => $now,
-            'last_seen' => $now,
-        ));
+        $allowed = array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term');
+        $row = array('session_key' => $key, 'landing_url' => isset($_SERVER['REQUEST_URI']) ? esc_url_raw(wp_unslash($_SERVER['REQUEST_URI'])) : null, 'first_seen' => $now, 'last_seen' => $now);
+        foreach ($allowed as $field) $row[$field] = isset($data[$field]) ? sanitize_text_field($data[$field]) : null;
+        $wpdb->insert($table, $row);
         return $key;
     }
 }
