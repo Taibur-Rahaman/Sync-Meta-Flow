@@ -37,3 +37,6 @@ jobs:
       - name: CAPI idempotency tests
         if: matrix.php-version == '8.3'
         run: php tests/test-capi-idempotency.php
+      - name: CAPI retry classification tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-capi-retry.php
