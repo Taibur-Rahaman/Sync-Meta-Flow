@@ -3,7 +3,7 @@
  * Plugin Name: Sync Meta Flow
  * Plugin URI: https://github.com/Taibur-Rahaman/Sync-Meta-Flow
  * Description: Easy WooCommerce Meta tracking, first/last-touch attribution, order-flow, ROAS and courier intelligence with no-code setup.
- * Version: 1.6.0
+ * Version: 1.7.0
  * Author: Taibur Rahaman
  * License: GPL-2.0-or-later
  * Requires at least: 6.4
@@ -11,7 +11,7 @@
  * Requires Plugins: woocommerce
  */
 defined('ABSPATH') || exit;
-define('SMF_VERSION','1.6.0');define('SMF_FILE',__FILE__);define('SMF_DIR',plugin_dir_path(__FILE__));define('SMF_URL',plugin_dir_url(__FILE__));
+define('SMF_VERSION','1.7.0');define('SMF_FILE',__FILE__);define('SMF_DIR',plugin_dir_path(__FILE__));define('SMF_URL',plugin_dir_url(__FILE__));
 require_once SMF_DIR.'includes/class-smf-installer.php';
 require_once SMF_DIR.'includes/class-smf-attribution.php';
 require_once SMF_DIR.'includes/class-smf-tracker.php';
