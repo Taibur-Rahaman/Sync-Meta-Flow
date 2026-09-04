@@ -5,13 +5,13 @@ class SMF_Meta_CAPI {
     const MAX_ATTEMPTS = 5;
 
     public static function init() {
+        add_filter('cron_schedules', array(__CLASS__, 'cron_schedules'));
         add_action('woocommerce_checkout_order_processed', array(__CLASS__, 'send_purchase'), 20, 3);
         add_action('woocommerce_order_status_smf-delivered', array(__CLASS__, 'send_delivered'), 20);
         add_action('smf_process_capi_queue', array(__CLASS__, 'process_queue'));
         if (!wp_next_scheduled('smf_process_capi_queue')) {
             wp_schedule_event(time() + 60, 'five_minutes', 'smf_process_capi_queue');
         }
-        add_filter('cron_schedules', array(__CLASS__, 'cron_schedules'));
     }
 
     public static function cron_schedules($schedules) {
@@ -42,41 +42,22 @@ class SMF_Meta_CAPI {
 
     private static function purchase_payload($order, $event_id) {
         return array('data' => array(array(
-            'event_name' => 'Purchase',
-            'event_time' => time(),
-            'action_source' => 'website',
-            'event_id' => $event_id,
+            'event_name' => 'Purchase', 'event_time' => time(), 'action_source' => 'website', 'event_id' => $event_id,
             'user_data' => self::user_data($order),
-            'custom_data' => array(
-                'currency' => $order->get_currency(),
-                'value' => (float) $order->get_total(),
-                'order_id' => (string) $order->get_id(),
-                'content_type' => 'product',
-            ),
+            'custom_data' => array('currency' => $order->get_currency(), 'value' => (float) $order->get_total(), 'order_id' => (string) $order->get_id(), 'content_type' => 'product'),
         )));
     }
 
     private static function delivered_payload($order, $event_id) {
         return array('data' => array(array(
-            'event_name' => 'OrderDelivered',
-            'event_time' => time(),
-            'action_source' => 'website',
-            'event_id' => $event_id,
+            'event_name' => 'OrderDelivered', 'event_time' => time(), 'action_source' => 'website', 'event_id' => $event_id,
             'user_data' => self::user_data($order),
-            'custom_data' => array(
-                'currency' => $order->get_currency(),
-                'value' => (float) $order->get_total(),
-                'order_id' => (string) $order->get_id(),
-                'content_type' => 'product',
-                'order_status' => 'delivered',
-            ),
+            'custom_data' => array('currency' => $order->get_currency(), 'value' => (float) $order->get_total(), 'order_id' => (string) $order->get_id(), 'content_type' => 'product', 'order_status' => 'delivered'),
         )));
     }
 
     private static function configured() {
-        return get_option('smf_meta_enabled', 'no') === 'yes'
-            && trim((string) get_option('smf_meta_pixel_id', '')) !== ''
-            && trim((string) get_option('smf_meta_access_token', '')) !== '';
+        return get_option('smf_meta_enabled', 'no') === 'yes' && trim((string) get_option('smf_meta_pixel_id', '')) !== '' && trim((string) get_option('smf_meta_access_token', '')) !== '';
     }
 
     private static function user_data($order) {
@@ -88,9 +69,7 @@ class SMF_Meta_CAPI {
         $session = $order->get_meta('_smf_session_key');
         if ($session) {
             $row = self::session_row($session);
-            if (!empty($row['fbclid'])) {
-                $data['fbc'] = 'fb.1.' . time() * 1000 . '.' . sanitize_text_field($row['fbclid']);
-            }
+            if (!empty($row['fbclid'])) $data['fbc'] = 'fb.1.' . time() * 1000 . '.' . sanitize_text_field($row['fbclid']);
         }
         $fbp = $order->get_meta('_smf_fbp');
         if ($fbp) $data['fbp'] = sanitize_text_field($fbp);
@@ -99,10 +78,7 @@ class SMF_Meta_CAPI {
 
     private static function session_row($session) {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
-            'SELECT fbclid, utm_source FROM ' . $wpdb->prefix . 'smf_tracking_sessions WHERE session_key = %s LIMIT 1',
-            $session
-        ), ARRAY_A);
+        $row = $wpdb->get_row($wpdb->prepare('SELECT fbclid, utm_source FROM ' . $wpdb->prefix . 'smf_tracking_sessions WHERE session_key = %s LIMIT 1', $session), ARRAY_A);
         return is_array($row) ? $row : array();
     }
 
@@ -121,10 +97,7 @@ class SMF_Meta_CAPI {
         if (!self::configured()) return;
         global $wpdb;
         $table = $wpdb->prefix . 'smf_capi_queue';
-        $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table WHERE status = 'pending' AND next_attempt_at <= %s ORDER BY id ASC LIMIT 10",
-            current_time('mysql')
-        ), ARRAY_A);
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table WHERE status = 'pending' AND next_attempt_at <= %s ORDER BY id ASC LIMIT 10", current_time('mysql')), ARRAY_A);
         foreach ((array) $rows as $row) {
             $payload = json_decode($row['payload'], true);
             if (!is_array($payload)) {
@@ -150,7 +123,7 @@ class SMF_Meta_CAPI {
         }
         $delays = array(300, 900, 3600, 10800, 43200);
         $delay = $delays[min($attempts - 1, count($delays) - 1)];
-        $next = gmdate('Y-m-d H:i:s', time() + $delay + (int) (get_option('gmt_offset') * HOUR_IN_SECONDS));
+        $next = wp_date('Y-m-d H:i:s', current_time('timestamp') + $delay, wp_timezone());
         $wpdb->update($table, array('attempts' => $attempts, 'status' => 'pending', 'next_attempt_at' => $next, 'last_error' => substr((string) $error, 0, 1000)), array('id' => (int) $row['id']), array('%d', '%s', '%s', '%s'), array('%d'));
     }
 
@@ -159,9 +132,7 @@ class SMF_Meta_CAPI {
         $table = $wpdb->prefix . 'smf_capi_queue';
         $stats = array('pending' => 0, 'sent' => 0, 'failed' => 0, 'total' => 0, 'last_sent' => null, 'last_error' => null);
         $rows = $wpdb->get_results("SELECT status, COUNT(*) count FROM $table GROUP BY status", ARRAY_A);
-        foreach ((array) $rows as $row) {
-            if (isset($stats[$row['status']])) $stats[$row['status']] = (int) $row['count'];
-        }
+        foreach ((array) $rows as $row) if (isset($stats[$row['status']])) $stats[$row['status']] = (int) $row['count'];
         $stats['total'] = $stats['pending'] + $stats['sent'] + $stats['failed'];
         $stats['last_sent'] = $wpdb->get_var("SELECT sent_at FROM $table WHERE status='sent' ORDER BY sent_at DESC LIMIT 1");
         $stats['last_error'] = $wpdb->get_var("SELECT last_error FROM $table WHERE last_error IS NOT NULL AND last_error <> '' ORDER BY id DESC LIMIT 1");
@@ -169,25 +140,17 @@ class SMF_Meta_CAPI {
     }
 
     public static function test_connection() {
-        if (!current_user_can('manage_woocommerce')) {
-            wp_send_json_error(array('message' => 'Permission denied.'), 403);
-        }
+        if (!current_user_can('manage_woocommerce')) wp_send_json_error(array('message' => 'Permission denied.'), 403);
         check_ajax_referer('smf_admin', 'nonce');
         $pixel_id = preg_replace('/[^0-9]/', '', (string) get_option('smf_meta_pixel_id', ''));
         $token = trim((string) get_option('smf_meta_access_token', ''));
-        if (!$pixel_id || !$token) {
-            wp_send_json_error(array('message' => 'Add a Meta Pixel ID and Conversions API access token first.'), 400);
-        }
+        if (!$pixel_id || !$token) wp_send_json_error(array('message' => 'Add a Meta Pixel ID and Conversions API access token first.'), 400);
         $url = 'https://graph.facebook.com/v23.0/' . rawurlencode($pixel_id) . '?fields=id,name&access_token=' . rawurlencode($token);
         $response = wp_remote_get($url, array('timeout' => 15));
-        if (is_wp_error($response)) {
-            wp_send_json_error(array('message' => $response->get_error_message()), 502);
-        }
+        if (is_wp_error($response)) wp_send_json_error(array('message' => $response->get_error_message()), 502);
         $code = (int) wp_remote_retrieve_response_code($response);
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        if ($code >= 200 && $code < 300 && !empty($body['id'])) {
-            wp_send_json_success(array('message' => 'Meta connection successful.', 'pixel_id' => $body['id'], 'name' => isset($body['name']) ? $body['name'] : ''));
-        }
+        if ($code >= 200 && $code < 300 && !empty($body['id'])) wp_send_json_success(array('message' => 'Meta connection successful.', 'pixel_id' => $body['id'], 'name' => isset($body['name']) ? $body['name'] : ''));
         $message = !empty($body['error']['message']) ? $body['error']['message'] : 'Meta returned HTTP ' . $code . '.';
         wp_send_json_error(array('message' => $message), $code >= 400 && $code < 600 ? $code : 502);
     }
@@ -197,15 +160,13 @@ class SMF_Meta_CAPI {
         $token = trim((string) get_option('smf_meta_access_token', ''));
         if (!$pixel_id || !$token) return array('success' => false, 'error' => 'Meta Pixel ID or access token is missing.');
         $response = wp_remote_post('https://graph.facebook.com/v23.0/' . rawurlencode($pixel_id) . '/events', array(
-            'timeout' => 15,
-            'headers' => array('Content-Type' => 'application/json'),
+            'timeout' => 15, 'headers' => array('Content-Type' => 'application/json'),
             'body' => wp_json_encode(array_merge($payload, array('access_token' => $token))),
         ));
         if (is_wp_error($response)) return array('success' => false, 'error' => $response->get_error_message());
         $code = (int) wp_remote_retrieve_response_code($response);
         if ($code >= 200 && $code < 300) return array('success' => true, 'error' => '');
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        $message = !empty($body['error']['message']) ? $body['error']['message'] : 'Meta returned HTTP ' . $code . '.';
-        return array('success' => false, 'error' => $message);
+        return array('success' => false, 'error' => !empty($body['error']['message']) ? $body['error']['message'] : 'Meta returned HTTP ' . $code . '.');
     }
 }
