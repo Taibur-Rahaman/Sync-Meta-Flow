@@ -5,6 +5,8 @@ class SMF_Order_Events {
     public static function init() {
         add_action('woocommerce_checkout_order_processed', array(__CLASS__, 'purchase'), 10, 3);
         add_action('woocommerce_order_status_changed', array(__CLASS__, 'status_changed'), 10, 4);
+        add_action('wp_ajax_smf_track_event', array(__CLASS__, 'browser_event'));
+        add_action('wp_ajax_nopriv_smf_track_event', array(__CLASS__, 'browser_event'));
     }
 
     public static function purchase($order_id, $posted_data, $order) {
@@ -14,6 +16,14 @@ class SMF_Order_Events {
 
     public static function status_changed($order_id, $old_status, $new_status, $order) {
         self::log($order_id, 'status_changed', $old_status, $new_status, 'woocommerce');
+    }
+
+    public static function browser_event() {
+        check_ajax_referer('smf_track', 'nonce');
+        $event = isset($_POST['event']) ? sanitize_key(wp_unslash($_POST['event'])) : '';
+        $allowed = array('page_view', 'view_content', 'add_to_cart', 'initiate_checkout');
+        if (!in_array($event, $allowed, true)) wp_send_json_error(array('message' => 'Invalid event'), 400);
+        wp_send_json_success();
     }
 
     private static function attach_attribution($order) {
