@@ -43,6 +43,9 @@ jobs:
       - name: Courier replay tests
         if: matrix.php-version == '8.3'
         run: php tests/test-courier-replay.php
+      - name: Courier mutation failure tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-mutation-failure.php
       - name: CAPI idempotency tests
         if: matrix.php-version == '8.3'
         run: php tests/test-capi-idempotency.php
