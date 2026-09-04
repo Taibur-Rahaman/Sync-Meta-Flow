@@ -34,6 +34,9 @@ jobs:
       - name: Courier identity tests
         if: matrix.php-version == '8.3'
         run: php tests/test-courier-identity.php
+      - name: Courier shipment hardening tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-operations-hardening.php
       - name: CAPI idempotency tests
         if: matrix.php-version == '8.3'
         run: php tests/test-capi-idempotency.php
