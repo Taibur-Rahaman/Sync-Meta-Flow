@@ -2,7 +2,7 @@
   'use strict';
   var data = window.SMF_DATA || {};
   var attribution = window.SMF_ATTRIBUTION || {};
-  var keys = ['fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term'];
+  var keys = ['fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id','campaign_id','adset_id','ad_id'];
 
   function readCookie(name) {
     var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
