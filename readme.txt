@@ -4,41 +4,29 @@ Tags: woocommerce, facebook, meta, attribution, analytics, ecommerce, roas, cour
 Requires at least: 6.4
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.5.0
+Stable tag: 1.6.0
 License: GPLv2 or later
 
-WooCommerce order-flow tracking and Meta attribution for F-commerce stores, with purchase-to-delivery revenue intelligence and courier automation.
+WooCommerce order-flow tracking and Meta attribution for F-commerce stores, with first/last-touch attribution, purchase-to-delivery revenue intelligence and courier automation.
 
-== v1.5 features ==
-* Capture Facebook click and UTM attribution.
-* Persist Campaign ID, Ad Set ID and Ad ID attribution on WooCommerce orders.
-* Track WooCommerce purchase and order-status transitions.
-* Track delivery, cancellation and return outcomes.
-* Ad Spend & ROAS reporting with 7/30/90 day periods.
-* Match spend to orders by Ad ID, then Ad Set ID, then Campaign ID.
-* Calculate Purchase ROAS, Delivered ROAS and Net Realized ROAS.
-* Calculate cost per delivered order, cancellation rate and return rate.
-* Retain historical status milestones so later delivery/return events update the original purchase cohort.
-* Provide SCALE / WATCH / KILL decision heuristics based on Net Realized ROAS.
-* Meta Conversions API queue and event deduplication foundation.
-* Meta Ads Sync admin page for automatic spend import from the Meta Ads Insights API.
-* Automatic spend refresh every 6 hours through WP-Cron.
-* Courier webhook bridge with HMAC-SHA256 authentication.
-* Native Steadfast shipment creation from the WooCommerce order screen.
-* Save Steadfast consignment ID, tracking code, COD amount and courier metadata.
-* Map courier updates to Confirmed, Shipped, Delivered, Returned, Cancelled and other WooCommerce states.
-* Provider presets for Pathao, Steadfast and RedX normalized webhook flows.
-* Idempotent courier webhook event storage using event/body hashes.
-* Courier event audit trail with processed/failed status and HTTP response code.
-* Per-order courier event timeline in the WooCommerce admin order screen.
-* Robust courier order matching through stored courier invoice metadata.
+== v1.6 features ==
+* Preserve first-touch and last-touch attribution independently for each 30-day tracking session.
+* Capture Facebook click, UTM, Campaign ID, Ad Set ID and Ad ID attribution.
+* Copy both first-touch and last-touch attribution to WooCommerce orders at purchase.
+* Compare first-touch discovery, last-touch conversion and assisted campaign influence.
+* Add a dedicated Meta Flow > Attribution Models report.
+* Keep WooCommerce purchase and order-status transitions linked to attribution snapshots.
+* Retain all v1.5 order-flow, ROAS, Meta CAPI, Meta Ads Sync and courier intelligence features.
+
+== Attribution model ==
+First-touch represents the earliest attributable campaign recorded for the tracking session. Last-touch represents the most recent attributable campaign before purchase. Direct visits do not erase an existing attributable touch because only non-empty campaign/source parameters update last-touch.
+
+If first-touch and last-touch campaigns differ, the first-touch campaign receives an assisted conversion signal. This is an internal analytics model; it does not claim to reproduce Meta Ads Manager's proprietary attribution calculations.
 
 == v1.5 courier reliability ==
 Courier webhook requests are authenticated before idempotency records are accepted. A provider event ID, when supplied, is retained; otherwise the exact raw request body is hashed so retries of the same payload are safely recognized as duplicates.
 
 Each webhook event stores provider, event ID, payload hash, order ID, status, received time, processing result and response code. Duplicate deliveries return a successful `duplicate` response without applying the WooCommerce status transition again.
-
-The WooCommerce order screen shows recent courier events, including provider, normalized status and processing state.
 
 == Courier webhook ==
 The endpoint is available at `/wp-json/sync-meta-flow/v1/courier/webhook`.
@@ -48,15 +36,13 @@ Send JSON such as:
 Sign the exact raw JSON body with HMAC-SHA256 using the configured webhook secret and send:
 `X-SMF-Signature: sha256=<hex digest>`
 
-The webhook can identify an order by `order_id` or a previously stored `_smf_courier_invoice`. Tracking code, COD amount and delivery fee can be persisted when supplied.
-
 == Important ==
 * Meta Ads Sync requires a Meta Ad Account ID and an access token with permission to read Ads Insights.
 * Verify the Meta account currency before using financial reports.
 * Never expose courier API keys, secret keys or webhook secrets publicly.
 * Native courier API behavior is provider-specific; do not paste credentials into the repository.
 * ROAS requires spend and order attribution to use the same Campaign / Ad Set / Ad IDs and currency.
-* Orders cannot be reliably matched from campaign names alone, so name-only attribution is not force-matched.
+* First/last-touch reports are Sync Meta Flow's own deterministic model and should not be presented as Meta's official attribution numbers.
 * SCALE / WATCH / KILL thresholds are heuristics, not profitability guarantees. Use your actual product margin, shipping, COD and return costs.
 * Net Realized Revenue is Delivered Revenue minus Returned/Refunded order value in the selected purchase cohort.
 * WP-Cron depends on WordPress traffic. For low-traffic stores, use a real server cron to trigger wp-cron.php reliably.
@@ -64,18 +50,18 @@ The webhook can identify an order by `order_id` or a previously stored `_smf_cou
 == Installation ==
 1. Install and activate WooCommerce.
 2. Upload the Sync Meta Flow folder to wp-content/plugins/ or install a ZIP.
-3. Activate Sync Meta Flow.
+3. Activate Sync Meta Flow or allow the v1.6 upgrade to run automatically.
 4. Open Meta Flow > Setup and configure your Pixel and CAPI access token.
-5. Open Meta Flow > Meta Ads Sync and enter your Meta Ad Account ID.
-6. Save the sync settings and click Sync Meta Spend Now.
-7. Open Meta Flow > Ad Spend & ROAS to review attributed performance.
-8. Open Meta Flow > Courier & Delivery and select your provider.
-9. For Steadfast, enter the merchant API key and secret key, then create shipments from WooCommerce orders.
-10. Configure your courier webhook to POST signed normalized shipment events.
+5. Open Meta Flow > Attribution Models to compare campaign touchpoints.
+6. Open Meta Flow > Meta Ads Sync and enter your Meta Ad Account ID.
+7. Save the sync settings and click Sync Meta Spend Now.
+8. Open Meta Flow > Ad Spend & ROAS to review attributed performance.
+9. Open Meta Flow > Courier & Delivery and select your provider.
+10. For Steadfast, enter the merchant API key and secret key, then create shipments from WooCommerce orders.
 
 == Roadmap ==
+* Attribution-model-aware ROAS: first-touch ROAS, last-touch ROAS and assisted revenue allocation.
 * Verified native Pathao merchant API adapter with configurable store/area mapping.
 * Verified native RedX merchant API adapter.
-* First-touch / last-touch attribution controls.
 * AI customer quality and cancellation insights.
 * Multi-store SaaS backend.
