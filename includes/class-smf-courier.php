@@ -74,15 +74,22 @@ class SMF_Courier {
         $tracking = '';
         foreach (array('tracking_number','tracking_code','consignment_id') as $key) if (!empty($data[$key])) { $tracking = sanitize_text_field((string)$data[$key]); break; }
         $provider = !empty($data['provider']) ? sanitize_key($data['provider']) : self::provider();
-        $order->update_meta_data('_smf_courier_provider', $provider);
-        $order->update_meta_data('_smf_courier_last_status', sanitize_key((string)$raw_status));
-        $order->update_meta_data('_smf_courier_updated_at', current_time('mysql'));
-        if ($tracking) $order->update_meta_data('_smf_tracking_number', $tracking);
-        if (!empty($data['cod_amount'])) $order->update_meta_data('_smf_courier_cod_amount', wc_format_decimal($data['cod_amount']));
-        if (!empty($data['delivery_fee'])) $order->update_meta_data('_smf_courier_delivery_fee', wc_format_decimal($data['delivery_fee']));
-        $order->save();
-        $current = $order->get_status(); $target_status = str_replace('wc-', '', $target);
-        if ($current !== $target_status) $order->update_status($target_status, sprintf('Sync Meta Flow courier update: %s%s', sanitize_text_field((string)$raw_status), $tracking ? ' · '.$tracking : ''), true);
+
+        try {
+            $order->update_meta_data('_smf_courier_provider', $provider);
+            $order->update_meta_data('_smf_courier_last_status', sanitize_key((string)$raw_status));
+            $order->update_meta_data('_smf_courier_updated_at', current_time('mysql'));
+            if ($tracking) $order->update_meta_data('_smf_tracking_number', $tracking);
+            if (!empty($data['cod_amount'])) $order->update_meta_data('_smf_courier_cod_amount', wc_format_decimal($data['cod_amount']));
+            if (!empty($data['delivery_fee'])) $order->update_meta_data('_smf_courier_delivery_fee', wc_format_decimal($data['delivery_fee']));
+            $order->save();
+
+            $current = $order->get_status(); $target_status = str_replace('wc-', '', $target);
+            if ($current !== $target_status) $order->update_status($target_status, sprintf('Sync Meta Flow courier update: %s%s', sanitize_text_field((string)$raw_status), $tracking ? ' · '.$tracking : ''), true);
+        } catch (Throwable $e) {
+            return new WP_Error('smf_webhook_mutation_failed', 'Courier webhook order mutation failed; the event will remain retryable.', array('status'=>500));
+        }
+
         return new WP_REST_Response(array('ok'=>true,'order_id'=>$order_id,'status'=>$target,'tracking_number'=>$tracking,'provider'=>$provider), 200);
     }
 
@@ -111,22 +118,11 @@ class SMF_Courier {
         $token = wp_generate_uuid4();
         $now = time();
         $value = $token . ':' . $now;
-        $inserted = $wpdb->query($wpdb->prepare(
-            "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
-            $key,
-            $value
-        ));
+        $inserted = $wpdb->query($wpdb->prepare("INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", $key, $value));
         if ($inserted === 1) return $token;
-
         $cutoff = $now - self::SHIPMENT_LOCK_TTL;
-        $replaced = $wpdb->query($wpdb->prepare(
-            "UPDATE {$wpdb->options} SET option_value = %s, autoload = 'no' WHERE option_name = %s AND CAST(SUBSTRING_INDEX(option_value, ':', -1) AS UNSIGNED) <= %d",
-            $value,
-            $key,
-            $cutoff
-        ));
+        $replaced = $wpdb->query($wpdb->prepare("UPDATE {$wpdb->options} SET option_value = %s, autoload = 'no' WHERE option_name = %s AND CAST(SUBSTRING_INDEX(option_value, ':', -1) AS UNSIGNED) <= %d", $value, $key, $cutoff));
         if ($replaced !== 1) return false;
-
         wp_cache_delete($key, 'options');
         return get_option($key, '') === $value ? $token : false;
     }
