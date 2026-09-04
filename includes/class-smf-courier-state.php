@@ -36,6 +36,28 @@ class SMF_Courier_State {
         return is_numeric($invoice) ? absint($invoice) : 0;
     }
 
+    private static function payload_value($data, $keys) {
+        foreach ($keys as $key) {
+            if (isset($data[$key]) && is_scalar($data[$key]) && trim((string) $data[$key]) !== '') return sanitize_text_field((string) $data[$key]);
+        }
+        return '';
+    }
+
+    private static function identity_matches($order, $data) {
+        $checks = array(
+            array('_smf_courier_invoice', array('order_number', 'invoice', 'merchant_invoice_id')),
+            array('_smf_courier_consignment_id', array('consignment_id', 'consignment', 'consignment_id_number')),
+            array('_smf_tracking_number', array('tracking_number', 'tracking_code')),
+            array('_smf_courier_tracking_code', array('tracking_number', 'tracking_code')),
+        );
+        foreach ($checks as $check) {
+            $stored = trim((string) $order->get_meta($check[0]));
+            $incoming = self::payload_value($data, $check[1]);
+            if ($stored !== '' && $incoming !== '' && !hash_equals(strtolower($stored), strtolower($incoming))) return false;
+        }
+        return true;
+    }
+
     private static function transition_allowed($current, $target) {
         if ($current === $target || $current === '') return true;
         $allowed = array(
@@ -58,6 +80,15 @@ class SMF_Courier_State {
         if (!$order_id) return $result;
         $order = wc_get_order($order_id);
         if (!$order) return $result;
+        if (!self::identity_matches($order, $data)) {
+            if (class_exists('SMF_Courier_Timeline')) SMF_Courier_Timeline::mark_webhook_ignored($request);
+            return new WP_REST_Response(array(
+                'ok' => true,
+                'ignored' => true,
+                'reason' => 'courier_identity_mismatch',
+                'order_id' => $order_id,
+            ), 200);
+        }
         $current = self::normalize($order->get_status());
         if (self::transition_allowed($current, $target)) return $result;
         if (class_exists('SMF_Courier_Timeline')) SMF_Courier_Timeline::mark_webhook_ignored($request);
