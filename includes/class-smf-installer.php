@@ -7,81 +7,17 @@ class SMF_Installer {
         update_option('smf_version', SMF_VERSION);
         add_option('smf_meta_enabled', 'no');
     }
-
     public static function maybe_upgrade() {
-        if (get_option('smf_version') !== SMF_VERSION) {
-            self::create_tables();
-            update_option('smf_version', SMF_VERSION);
-        }
+        if (get_option('smf_version') !== SMF_VERSION) { self::create_tables(); update_option('smf_version', SMF_VERSION); }
     }
-
     private static function create_tables() {
-        global $wpdb;
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-        $charset = $wpdb->get_charset_collate();
-        $events = $wpdb->prefix . 'smf_order_events';
-        $sessions = $wpdb->prefix . 'smf_tracking_sessions';
-        $tracking = $wpdb->prefix . 'smf_tracking_events';
-        $queue = $wpdb->prefix . 'smf_capi_queue';
-
-        dbDelta("CREATE TABLE $events (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            order_id bigint(20) unsigned NOT NULL,
-            event_type varchar(64) NOT NULL,
-            old_status varchar(32) DEFAULT NULL,
-            new_status varchar(32) DEFAULT NULL,
-            source varchar(64) DEFAULT NULL,
-            metadata longtext DEFAULT NULL,
-            created_at datetime NOT NULL,
-            PRIMARY KEY (id), KEY order_id (order_id), KEY event_type (event_type), KEY created_at (created_at)
-        ) $charset;");
-        dbDelta("CREATE TABLE $sessions (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            session_key varchar(64) NOT NULL,
-            fbclid text DEFAULT NULL,
-            fbp varchar(255) DEFAULT NULL,
-            fbc varchar(255) DEFAULT NULL,
-            utm_source varchar(255) DEFAULT NULL,
-            utm_medium varchar(255) DEFAULT NULL,
-            utm_campaign varchar(255) DEFAULT NULL,
-            utm_content varchar(255) DEFAULT NULL,
-            utm_term varchar(255) DEFAULT NULL,
-            utm_id varchar(255) DEFAULT NULL,
-            campaign_id varchar(255) DEFAULT NULL,
-            adset_id varchar(255) DEFAULT NULL,
-            ad_id varchar(255) DEFAULT NULL,
-            landing_url text DEFAULT NULL,
-            first_seen datetime NOT NULL,
-            last_seen datetime NOT NULL,
-            PRIMARY KEY (id), UNIQUE KEY session_key (session_key), KEY fbclid (fbclid(255)), KEY utm_campaign (utm_campaign(191))
-        ) $charset;");
-        dbDelta("CREATE TABLE $tracking (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            session_key varchar(64) NOT NULL,
-            event_name varchar(64) NOT NULL,
-            event_id varchar(128) DEFAULT NULL,
-            page_url text DEFAULT NULL,
-            payload longtext DEFAULT NULL,
-            created_at datetime NOT NULL,
-            PRIMARY KEY (id), KEY session_key (session_key), KEY event_name (event_name), KEY event_id (event_id), KEY created_at (created_at)
-        ) $charset;");
-        dbDelta("CREATE TABLE $queue (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            order_id bigint(20) unsigned NOT NULL,
-            event_name varchar(64) NOT NULL,
-            event_id varchar(128) NOT NULL,
-            payload longtext NOT NULL,
-            attempts smallint(5) unsigned NOT NULL DEFAULT 0,
-            status varchar(20) NOT NULL DEFAULT 'pending',
-            next_attempt_at datetime NOT NULL,
-            last_error text DEFAULT NULL,
-            created_at datetime NOT NULL,
-            sent_at datetime DEFAULT NULL,
-            PRIMARY KEY (id), UNIQUE KEY event_id (event_id), KEY status_next (status,next_attempt_at), KEY order_id (order_id)
-        ) $charset;");
+        global $wpdb; require_once ABSPATH . 'wp-admin/includes/upgrade.php'; $charset=$wpdb->get_charset_collate();
+        $events=$wpdb->prefix.'smf_order_events'; $sessions=$wpdb->prefix.'smf_tracking_sessions'; $tracking=$wpdb->prefix.'smf_tracking_events'; $queue=$wpdb->prefix.'smf_capi_queue'; $spend=$wpdb->prefix.'smf_campaign_spend';
+        dbDelta("CREATE TABLE $events (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,order_id bigint(20) unsigned NOT NULL,event_type varchar(64) NOT NULL,old_status varchar(32) DEFAULT NULL,new_status varchar(32) DEFAULT NULL,source varchar(64) DEFAULT NULL,metadata longtext DEFAULT NULL,created_at datetime NOT NULL,PRIMARY KEY(id),KEY order_id(order_id),KEY event_type(event_type),KEY created_at(created_at)) $charset;");
+        dbDelta("CREATE TABLE $sessions (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,session_key varchar(64) NOT NULL,fbclid text DEFAULT NULL,fbp varchar(255) DEFAULT NULL,fbc varchar(255) DEFAULT NULL,utm_source varchar(255) DEFAULT NULL,utm_medium varchar(255) DEFAULT NULL,utm_campaign varchar(255) DEFAULT NULL,utm_content varchar(255) DEFAULT NULL,utm_term varchar(255) DEFAULT NULL,utm_id varchar(255) DEFAULT NULL,campaign_id varchar(255) DEFAULT NULL,adset_id varchar(255) DEFAULT NULL,ad_id varchar(255) DEFAULT NULL,landing_url text DEFAULT NULL,first_seen datetime NOT NULL,last_seen datetime NOT NULL,PRIMARY KEY(id),UNIQUE KEY session_key(session_key),KEY fbclid(fbclid(255)),KEY utm_campaign(utm_campaign(191))) $charset;");
+        dbDelta("CREATE TABLE $tracking (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,session_key varchar(64) NOT NULL,event_name varchar(64) NOT NULL,event_id varchar(128) DEFAULT NULL,page_url text DEFAULT NULL,payload longtext DEFAULT NULL,created_at datetime NOT NULL,PRIMARY KEY(id),KEY session_key(session_key),KEY event_name(event_name),KEY event_id(event_id),KEY created_at(created_at)) $charset;");
+        dbDelta("CREATE TABLE $queue (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,order_id bigint(20) unsigned NOT NULL,event_name varchar(64) NOT NULL,event_id varchar(128) NOT NULL,payload longtext NOT NULL,attempts smallint(5) unsigned NOT NULL DEFAULT 0,status varchar(20) NOT NULL DEFAULT 'pending',next_attempt_at datetime NOT NULL,last_error text DEFAULT NULL,created_at datetime NOT NULL,sent_at datetime DEFAULT NULL,PRIMARY KEY(id),UNIQUE KEY event_id(event_id),KEY status_next(status,next_attempt_at),KEY order_id(order_id)) $charset;");
+        dbDelta("CREATE TABLE $spend (id bigint(20) unsigned NOT NULL AUTO_INCREMENT,spend_date date NOT NULL,campaign_id varchar(255) DEFAULT NULL,adset_id varchar(255) DEFAULT NULL,ad_id varchar(255) DEFAULT NULL,amount decimal(20,4) NOT NULL DEFAULT 0,currency varchar(3) NOT NULL DEFAULT 'BDT',created_at datetime NOT NULL,PRIMARY KEY(id),KEY spend_date(spend_date),KEY campaign_id(campaign_id),KEY adset_id(adset_id),KEY ad_id(ad_id)) $charset;");
     }
-
-    public static function deactivate() {
-        wp_clear_scheduled_hook('smf_process_capi_queue');
-    }
+    public static function deactivate(){wp_clear_scheduled_hook('smf_process_capi_queue');}
 }
