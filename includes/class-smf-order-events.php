@@ -5,6 +5,7 @@ class SMF_Order_Events {
     public static function init() {
         add_action('woocommerce_checkout_order_processed', array(__CLASS__, 'purchase'), 10, 3);
         add_action('woocommerce_order_status_changed', array(__CLASS__, 'status_changed'), 10, 4);
+        add_action('woocommerce_admin_order_data_after_billing_address', array(__CLASS__, 'order_attribution_box'));
         add_action('wp_ajax_smf_track_event', array(__CLASS__, 'browser_event'));
         add_action('wp_ajax_nopriv_smf_track_event', array(__CLASS__, 'browser_event'));
     }
@@ -21,7 +22,7 @@ class SMF_Order_Events {
     public static function browser_event() {
         check_ajax_referer('smf_track', 'nonce');
         $event = isset($_POST['event']) ? sanitize_key(wp_unslash($_POST['event'])) : '';
-        $allowed = array('page_view', 'view_content', 'add_to_cart', 'initiate_checkout');
+        $allowed = array('page_view', 'view_content', 'add_to_cart', 'initiate_checkout', 'checkout_error');
         if (!in_array($event, $allowed, true)) wp_send_json_error(array('message' => 'Invalid event'), 400);
 
         $session = isset($_COOKIE['smf_session']) ? sanitize_text_field(wp_unslash($_COOKIE['smf_session'])) : '';
@@ -44,19 +45,39 @@ class SMF_Order_Events {
             'payload' => wp_json_encode($payload),
             'created_at' => current_time('mysql'),
         ));
+        SMF_Tracker::touch_session($session, isset($_COOKIE['smf_attribution']) ? json_decode(wp_unslash($_COOKIE['smf_attribution']), true) : array());
         wp_send_json_success(array('event_id' => $event_id));
     }
 
     private static function attach_attribution($order) {
+        $keys = array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term');
         if (!empty($_COOKIE['smf_attribution'])) {
             $raw = json_decode(wp_unslash($_COOKIE['smf_attribution']), true);
             if (is_array($raw)) {
-                $allowed = array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term');
-                foreach ($raw as $key => $value) {
-                    if (in_array($key, $allowed, true)) update_post_meta($order->get_id(), '_smf_' . $key, sanitize_text_field($value));
+                foreach ($keys as $key) {
+                    if (isset($raw[$key])) update_post_meta($order->get_id(), '_smf_' . $key, sanitize_text_field($raw[$key]));
                 }
             }
         }
+        if (!empty($_COOKIE['smf_session'])) update_post_meta($order->get_id(), '_smf_session_key', sanitize_text_field(wp_unslash($_COOKIE['smf_session'])));
+    }
+
+    public static function order_attribution_box($order) {
+        $keys = array(
+            'fbclid' => 'Facebook Click ID',
+            'utm_source' => 'Source',
+            'utm_medium' => 'Medium',
+            'utm_campaign' => 'Campaign',
+            'utm_content' => 'Content / Ad',
+            'utm_term' => 'Term',
+            'session_key' => 'Session',
+        );
+        echo '<div style="margin-top:20px;padding:12px;border:1px solid #ddd;background:#fff"><strong>Sync Meta Flow Attribution</strong><table style="width:100%;margin-top:8px">';
+        foreach ($keys as $key => $label) {
+            $value = get_post_meta($order->get_id(), '_smf_' . $key, true);
+            if ($value !== '') echo '<tr><td style="width:35%;padding:4px 0"><strong>' . esc_html($label) . '</strong></td><td style="padding:4px 0">' . esc_html($value) . '</td></tr>';
+        }
+        echo '</table></div>';
     }
 
     public static function log($order_id, $event_type, $old_status, $new_status, $source, $metadata = array()) {
