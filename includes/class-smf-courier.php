@@ -103,6 +103,8 @@ class SMF_Courier {
     }
 
     private static function create_steadfast_order($order) {
+        $existing_consignment = trim((string)$order->get_meta('_smf_courier_consignment_id'));
+        if ($existing_consignment !== '') return new WP_Error('smf_shipment_exists','A courier shipment already exists for this order.');
         $items = $order->get_items(); $names=array(); foreach ($items as $item) $names[]=$item->get_name().' x'.$item->get_quantity();
         $payload=array(
             'invoice'=>'SMF-'.$order->get_id(),
@@ -156,8 +158,8 @@ class SMF_Courier {
         update_option('smf_courier_webhook_secret', isset($_POST['webhook_secret']) ? sanitize_text_field(wp_unslash($_POST['webhook_secret'])) : '', false);
         $provider=isset($_POST['provider'])?sanitize_key($_POST['provider']):'generic';
         update_option('smf_courier_provider',in_array($provider,array('generic','pathao','steadfast','redx'),true)?$provider:'generic',false);
-        update_option('smf_steadfast_api_key',isset($_POST['steadfast_api_key'])?sanitize_text_field(wp_unslash($_POST['steadfast_api_key'])):'',false);
-        update_option('smf_steadfast_secret_key',isset($_POST['steadfast_secret_key'])?sanitize_text_field(wp_unslash($_POST['steadfast_secret_key'])):'',false);
+        if (isset($_POST['steadfast_api_key']) && trim((string)wp_unslash($_POST['steadfast_api_key'])) !== '') update_option('smf_steadfast_api_key',sanitize_text_field(wp_unslash($_POST['steadfast_api_key'])),false);
+        if (isset($_POST['steadfast_secret_key']) && trim((string)wp_unslash($_POST['steadfast_secret_key'])) !== '') update_option('smf_steadfast_secret_key',sanitize_text_field(wp_unslash($_POST['steadfast_secret_key'])),false);
         wp_safe_redirect(admin_url('admin.php?page=smf-courier&updated=1')); exit;
     }
 
