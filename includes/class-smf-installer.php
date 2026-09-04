@@ -8,6 +8,7 @@ class SMF_Installer {
         $charset = $wpdb->get_charset_collate();
         $events = $wpdb->prefix . 'smf_order_events';
         $sessions = $wpdb->prefix . 'smf_tracking_sessions';
+        $tracking = $wpdb->prefix . 'smf_tracking_events';
 
         $sql = "CREATE TABLE $events (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -18,10 +19,7 @@ class SMF_Installer {
             source varchar(64) DEFAULT NULL,
             metadata longtext DEFAULT NULL,
             created_at datetime NOT NULL,
-            PRIMARY KEY (id),
-            KEY order_id (order_id),
-            KEY event_type (event_type),
-            KEY created_at (created_at)
+            PRIMARY KEY (id), KEY order_id (order_id), KEY event_type (event_type), KEY created_at (created_at)
         ) $charset;
         CREATE TABLE $sessions (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -35,9 +33,17 @@ class SMF_Installer {
             landing_url text DEFAULT NULL,
             first_seen datetime NOT NULL,
             last_seen datetime NOT NULL,
-            PRIMARY KEY (id),
-            UNIQUE KEY session_key (session_key),
-            KEY fbclid (fbclid(255))
+            PRIMARY KEY (id), UNIQUE KEY session_key (session_key), KEY fbclid (fbclid(255))
+        ) $charset;
+        CREATE TABLE $tracking (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            session_key varchar(64) NOT NULL,
+            event_name varchar(64) NOT NULL,
+            event_id varchar(128) DEFAULT NULL,
+            page_url text DEFAULT NULL,
+            payload longtext DEFAULT NULL,
+            created_at datetime NOT NULL,
+            PRIMARY KEY (id), KEY session_key (session_key), KEY event_name (event_name), KEY event_id (event_id), KEY created_at (created_at)
         ) $charset;";
 
         foreach (preg_split('/;\s*CREATE TABLE/', $sql) as $i => $statement) {
