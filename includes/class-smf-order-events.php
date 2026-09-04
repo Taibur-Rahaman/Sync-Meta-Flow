@@ -32,14 +32,21 @@ class SMF_Order_Events {
         if (!$session || !preg_match('/^[a-f0-9-]{36}$/', $session)) $session = SMF_Tracker::save_session(array());
         $payload = array();
         if (isset($_POST['payload'])) {
-            $decoded = json_decode(wp_unslash($_POST['payload']), true);
+            $raw_payload = wp_unslash($_POST['payload']);
+            if (strlen($raw_payload) > 10000) wp_send_json_error(array('message' => 'Payload too large'), 413);
+            $decoded = json_decode($raw_payload, true);
             if (is_array($decoded)) $payload = array_slice($decoded, 0, 20, true);
         }
         $event_id = isset($payload['event_id']) ? sanitize_text_field($payload['event_id']) : wp_generate_uuid4();
         global $wpdb;
-        $wpdb->insert($wpdb->prefix . 'smf_tracking_events', array('session_key'=>$session,'event_name'=>$event,'event_id'=>$event_id,'page_url'=>isset($payload['page_url']) ? esc_url_raw($payload['page_url']) : '','payload'=>wp_json_encode($payload),'created_at'=>current_time('mysql')));
-        SMF_Tracker::touch_session($session, isset($_COOKIE['smf_attribution']) ? json_decode(wp_unslash($_COOKIE['smf_attribution']), true) : array());
-        wp_send_json_success(array('event_id' => $event_id));
+        $table = $wpdb->prefix . 'smf_tracking_events';
+        $existing = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table WHERE event_id = %s LIMIT 1", $event_id));
+        if (!$existing) {
+            $wpdb->insert($table, array('session_key'=>$session,'event_name'=>$event,'event_id'=>$event_id,'page_url'=>isset($payload['page_url']) ? esc_url_raw($payload['page_url']) : '','payload'=>wp_json_encode($payload),'created_at'=>current_time('mysql')));
+        }
+        $attribution = !empty($_COOKIE['smf_attribution']) ? json_decode(wp_unslash($_COOKIE['smf_attribution']), true) : array();
+        SMF_Tracker::touch_session($session, is_array($attribution) ? $attribution : array());
+        wp_send_json_success(array('event_id' => $event_id, 'duplicate' => (bool) $existing));
     }
 
     private static function attach_attribution($order) {
@@ -47,6 +54,8 @@ class SMF_Order_Events {
         $raw = !empty($_COOKIE['smf_attribution']) ? json_decode(wp_unslash($_COOKIE['smf_attribution']), true) : array();
         if (is_array($raw)) foreach ($keys as $key) if (isset($raw[$key])) $order->update_meta_data('_smf_' . $key, sanitize_text_field($raw[$key]));
         if (!empty($_COOKIE['smf_session'])) $order->update_meta_data('_smf_session_key', sanitize_text_field(wp_unslash($_COOKIE['smf_session'])));
+        if (!empty($_COOKIE['_fbp'])) $order->update_meta_data('_smf_fbp', sanitize_text_field(wp_unslash($_COOKIE['_fbp'])));
+        if (!empty($_COOKIE['smf_fbc'])) $order->update_meta_data('_smf_fbc', sanitize_text_field(wp_unslash($_COOKIE['smf_fbc'])));
         $order->save();
     }
 
