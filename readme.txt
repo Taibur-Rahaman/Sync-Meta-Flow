@@ -4,12 +4,12 @@ Tags: woocommerce, facebook, meta, attribution, analytics, ecommerce, roas, cour
 Requires at least: 6.4
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 
 WooCommerce order-flow tracking and Meta attribution for F-commerce stores, with purchase-to-delivery revenue intelligence and courier automation.
 
-== v1.4 features ==
+== v1.5 features ==
 * Capture Facebook click and UTM attribution.
 * Persist Campaign ID, Ad Set ID and Ad ID attribution on WooCommerce orders.
 * Track WooCommerce purchase and order-status transitions.
@@ -27,21 +27,23 @@ WooCommerce order-flow tracking and Meta attribution for F-commerce stores, with
 * Native Steadfast shipment creation from the WooCommerce order screen.
 * Save Steadfast consignment ID, tracking code, COD amount and courier metadata.
 * Map courier updates to Confirmed, Shipped, Delivered, Returned, Cancelled and other WooCommerce states.
-* Pathao and RedX provider presets for normalized webhook flows.
+* Provider presets for Pathao, Steadfast and RedX normalized webhook flows.
+* Idempotent courier webhook event storage using event/body hashes.
+* Courier event audit trail with processed/failed status and HTTP response code.
+* Per-order courier event timeline in the WooCommerce admin order screen.
+* Robust courier order matching through stored courier invoice metadata.
 
-== v1.4 courier setup ==
-Open Meta Flow > Courier & Delivery.
+== v1.5 courier reliability ==
+Courier webhook requests are authenticated before idempotency records are accepted. A provider event ID, when supplied, is retained; otherwise the exact raw request body is hashed so retries of the same payload are safely recognized as duplicates.
 
-Steadfast native API uses the merchant API key and secret key. Shipment creation is available from an individual WooCommerce order after selecting Steadfast. The implementation uses the documented Steadfast API base and create-order contract.
+Each webhook event stores provider, event ID, payload hash, order ID, status, received time, processing result and response code. Duplicate deliveries return a successful `duplicate` response without applying the WooCommerce status transition again.
 
-Pathao currently exposes Developer API credentials and webhook configuration through its merchant platform. Sync Meta Flow keeps Pathao in the normalized webhook/provider layer until the merchant-specific API contract is configured.
-
-RedX is supported as a provider preset and normalized webhook source. Native RedX shipment creation is intentionally not guessed without a verified merchant API contract.
+The WooCommerce order screen shows recent courier events, including provider, normalized status and processing state.
 
 == Courier webhook ==
 The endpoint is available at `/wp-json/sync-meta-flow/v1/courier/webhook`.
 Send JSON such as:
-{"order_id":1234,"status":"delivered","tracking_number":"ABC123","provider":"steadfast","cod_amount":1500,"delivery_fee":70}
+{"order_id":1234,"event_id":"evt_123","status":"delivered","tracking_number":"ABC123","provider":"steadfast","cod_amount":1500,"delivery_fee":70}
 
 Sign the exact raw JSON body with HMAC-SHA256 using the configured webhook secret and send:
 `X-SMF-Signature: sha256=<hex digest>`
@@ -74,7 +76,6 @@ The webhook can identify an order by `order_id` or a previously stored `_smf_cou
 == Roadmap ==
 * Verified native Pathao merchant API adapter with configurable store/area mapping.
 * Verified native RedX merchant API adapter.
-* Courier tracking timeline and idempotent webhook event storage.
 * First-touch / last-touch attribution controls.
 * AI customer quality and cancellation insights.
 * Multi-store SaaS backend.
