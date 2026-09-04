@@ -1,6 +1,6 @@
 <?php
 /**
- * Static behavioral guard for Meta CAPI retry classification.
+ * Static behavioral guard for Meta CAPI retry and response handling.
  */
 $source = file_get_contents(__DIR__ . '/../includes/class-smf-meta-capi.php');
 if ($source === false) {
@@ -16,9 +16,11 @@ $checks = array(
     '$code===429' => '429 retries',
     '$code>=500' => '5xx retries',
     "'retryable'=>true,'error'=>$r->get_error_message()" => 'network errors retry',
+    "'retryable'=>false,'error'=>'Meta Pixel ID or access token is missing.'" => 'configuration errors fail permanently',
     "self::fail_row($row,$result['error'],$result['retryable'])" => 'queue uses retry classification',
     "self::fail_row($row,'Invalid queued payload.',false)" => 'invalid payload fails permanently',
-    "'retryable'=>false,'error'=>'Meta Pixel ID or access token is missing.'" => 'configuration errors fail permanently',
+    "'error'=>!empty($body['error']['message'])?$body['error']['message']:'Meta returned HTTP '.$code.'.'" => 'Meta error payload is surfaced',
+    "if($code>=200&&$code<300)return array('success'=>true,'retryable'=>false,'error'=>'');" => '2xx responses are successful',
 );
 
 $failed = false;
@@ -35,4 +37,4 @@ if ($failed) {
     exit(1);
 }
 
-echo "All CAPI retry classification invariants passed.\n";
+echo "All CAPI retry and response handling invariants passed.\n";
