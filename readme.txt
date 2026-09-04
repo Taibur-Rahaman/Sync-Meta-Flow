@@ -4,34 +4,32 @@ Tags: woocommerce, facebook, meta, attribution, analytics, ecommerce, roas, cour
 Requires at least: 6.4
 Requires PHP: 7.4
 Requires Plugins: woocommerce
-Stable tag: 2.0.0
+Stable tag: 2.0.1
 License: GPLv2 or later
 
 WooCommerce revenue intelligence for Meta-driven stores. Sync Meta Flow connects advertising attribution, WooCommerce order milestones, courier delivery outcomes and realized revenue so merchants can optimize for delivered business outcomes rather than purchases alone.
 
-== v2.0.0 — Sell-ready foundation ==
-* Production-oriented diagnostics and health checks under Meta Flow > Diagnostics.
-* Safe diagnostic snapshot with credentials and secrets redacted.
-* Hardened Meta Conversions API transport using Authorization Bearer headers instead of query-string tokens.
-* CAPI queue lock, original WooCommerce purchase timestamp and retry/error visibility.
-* Meta Ads spend sync now detects and stores the actual Meta Ad Account currency instead of assuming BDT.
-* Meta Ads sync uses Authorization headers and prevents overlapping sync runs.
-* WordPress privacy-policy guidance for attribution, tracking and courier data.
-* Safe uninstall behavior: plugin data is preserved by default unless an explicit delete option is enabled by a future/admin data-management control.
-* GPL-2.0-or-later license, security policy and PHP syntax CI.
-* Versioned upgrade path from earlier releases.
+== v2.0.1 — Sell-ready hardening ==
+* Added a unified order journey panel directly to WooCommerce order screens, compatible with modern WooCommerce order storage/HPOS screens.
+* Added WordPress privacy-policy guidance plus personal-data export and erasure integration.
+* Added an explicit, opt-in setting to delete plugin data on uninstall; data is preserved by default.
+* Fixed diagnostics health-check logic and kept credentials/secrets out of diagnostic snapshots.
+* Courier webhook idempotency now uses provider + provider event ID when available, with raw-body hashing only as fallback.
+* Retained v2.0.0 CAPI authentication, queue locking, account-currency detection, spend-sync locking and CI hardening.
 
 == Core product ==
 * No-code WooCommerce tracking for PageView, ViewContent, AddToCart, InitiateCheckout and Purchase.
 * First-touch and last-touch attribution snapshots with Facebook click ID, browser IDs, UTM and Meta campaign/ad-set/ad IDs.
 * WooCommerce order journey: Purchase → Confirmed → Shipped → Delivered, with Cancelled and Returned outcomes.
+* Unified order-level attribution, courier and event history.
 * Purchase, delivered and net-realized revenue reporting.
 * Purchase ROAS, Delivered ROAS and Net Realized ROAS.
 * Customer Quality scoring using delivery, confirmation, cancellation, return and net-ROAS signals.
 * Transparent SCALE / WATCH / KILL heuristic; this is not a profitability guarantee.
-* Meta Ads spend import at ad level with campaign/ad-set/ad identifiers.
-* Courier webhook bridge with HMAC-SHA256 authentication and idempotent event handling.
+* Meta Ads spend import at ad level with campaign/ad-set/ad identifiers and account currency.
+* Courier webhook bridge with HMAC-SHA256 authentication and canonical idempotency.
 * Native Steadfast shipment creation; Pathao and RedX remain provider-specific until their official merchant API contracts are verified.
+* Production diagnostics and safe diagnostic snapshot.
 
 == Attribution model ==
 First-touch represents the earliest attributable campaign recorded for a 30-day tracking session. Last-touch represents the most recent meaningful attributable touch before purchase. Direct visits do not erase an existing attributable touch.
@@ -53,7 +51,7 @@ Server-side Purchase and OrderDelivered events are queued and retried. Email and
 
 Access tokens are stored in WordPress options and are never displayed in diagnostics. Requests use HTTP Authorization headers rather than placing tokens in URLs.
 
-Meta Graph API versions can change. Before a production rollout, verify the configured Graph API version against Meta's current developer documentation and the permissions granted to the token.
+Meta Graph API versions can change. Before production rollout, verify the configured Graph API version and required permissions against Meta's current developer documentation.
 
 == Courier webhook ==
 Endpoint: `/wp-json/sync-meta-flow/v1/courier/webhook`
@@ -64,17 +62,24 @@ Requests must contain a valid HMAC-SHA256 signature using the configured webhook
 Example payload:
 `{"order_id":1234,"event_id":"evt_123","status":"delivered","tracking_number":"ABC123","provider":"steadfast","cod_amount":1500,"delivery_fee":70}`
 
-Webhook input is authenticated before the order status is changed. Provider event information and delivery state are retained for auditability.
+Webhook input is authenticated before the order status is changed. When a provider event ID is supplied, idempotency is based on provider + event ID; otherwise a raw request-body hash is used as fallback.
+
+== Privacy and data ==
+Sync Meta Flow can store attribution identifiers, tracking events, WooCommerce order-flow events and courier event payloads. Depending on configuration, hashed customer email/phone and Meta browser identifiers may be sent to Meta for Conversions API events. Courier integrations can transmit order/delivery data to the selected courier.
+
+The plugin integrates with WordPress privacy-policy guidance, personal-data export and personal-data erasure for plugin-owned order-related records. Tracking sessions that cannot be linked to an identified customer are not guessed or indiscriminately deleted by the privacy eraser.
+
+Store owners remain responsible for configuring consent, privacy notices, retention and third-party disclosures appropriate to their business and jurisdiction.
 
 == Installation ==
 1. Install and activate WooCommerce.
 2. Upload the Sync Meta Flow folder to `wp-content/plugins/` or install an installable ZIP.
-3. Activate Sync Meta Flow. Existing installations automatically run the 2.0 schema/version upgrade.
+3. Activate Sync Meta Flow. Existing installations automatically run the versioned schema upgrade.
 4. Open Meta Flow > Setup and configure the Meta Pixel and optional CAPI access token.
 5. Open Meta Flow > Diagnostics and resolve blocking checks.
 6. Open Meta Flow > Meta Ads Sync, enter the Meta Ad Account ID, save and run an initial sync.
 7. Confirm the detected ad-account currency before interpreting financial reports.
-8. Open Meta Flow > Ad Spend & ROAS and Meta Flow > Attribution & ROAS.
+8. Review Meta Flow > Ad Spend & ROAS and Meta Flow > Attribution & ROAS.
 9. Configure Courier & Delivery only if a courier workflow is needed.
 10. For Steadfast, enter merchant credentials and create shipments from WooCommerce orders.
 
@@ -87,28 +92,35 @@ Webhook input is authenticated before the order status is changed. Provider even
 * Test Purchase deduplication, delivery transitions, courier retries and returned orders on a staging store before production.
 * Verify Meta account currency and attribution IDs before evaluating ROAS.
 * Monitor Meta Flow > Diagnostics after launch.
+* Confirm WooCommerce HPOS and current WooCommerce compatibility on the target store.
 
 == Support / troubleshooting ==
-If events or spend are missing, start with Meta Flow > Diagnostics. Check WordPress/WooCommerce compatibility, database tables, Meta credentials, account currency, scheduled jobs and CAPI queue failures.
+Start with Meta Flow > Diagnostics when events or spend are missing. Check WordPress/WooCommerce compatibility, database tables, Meta credentials, account currency, scheduled jobs and CAPI queue failures.
 
 For courier issues, verify the webhook secret, provider selection, endpoint and HMAC signature. Native courier API behavior is provider-specific; do not assume undocumented Pathao or RedX endpoints.
 
-== Privacy and data ==
-Sync Meta Flow can store attribution identifiers, tracking events, WooCommerce order-flow events and courier event payloads. Depending on configuration, hashed customer email/phone and Meta browser identifiers may be sent to Meta for Conversions API events. Courier integrations can transmit order/delivery data to the selected courier.
-
-The plugin adds privacy-policy guidance. Store owners remain responsible for configuring consent, privacy notices, retention and third-party disclosures appropriate to their business and jurisdiction.
+For privacy requests, use WordPress Tools > Export Personal Data or Erase Personal Data. For full plugin removal, enable the explicit deletion option before uninstalling only if the merchant intentionally wants plugin-owned analytics data removed.
 
 == Security ==
 See `SECURITY.md` for responsible vulnerability reporting. Never include secrets or customer credentials in public reports.
 
+== Release status ==
+2.0.1 is a production-oriented release candidate. Code-level hardening and CI checks are included, but every merchant deployment should still complete live staging tests for its specific Meta account, WooCommerce version, theme, consent configuration and courier provider before charging customers or relying on financial decisions.
+
 == Changelog ==
+= 2.0.1 =
+* Added HPOS-compatible unified order journey.
+* Added privacy exporter/eraser integration.
+* Added explicit uninstall data-deletion control.
+* Fixed diagnostics health checks.
+* Improved courier webhook idempotency.
+
 = 2.0.0 =
 * Added production diagnostics.
 * Hardened Meta CAPI authentication and queue processing.
 * Hardened Meta spend sync and detected account currency.
 * Added privacy-policy integration and safe uninstall handler.
 * Added GPL license, security policy and PHP lint CI.
-* Updated documentation for commercial deployment.
 
 = 1.8.0 =
 * Added Customer Quality Intelligence and campaign quality scoring.
