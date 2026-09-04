@@ -10,6 +10,8 @@ class SMF_Tracker {
 
     public static function enqueue() {
         if (is_admin()) return;
+        $order_id = self::get_received_order_id();
+        $order = $order_id ? wc_get_order($order_id) : false;
         wp_enqueue_script('smf-tracker', SMF_URL . 'assets/js/tracker.js', array('jquery'), SMF_VERSION, true);
         wp_localize_script('smf-tracker', 'SMF_DATA', array(
             'ajaxUrl' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('smf_track'),
@@ -19,9 +21,20 @@ class SMF_Tracker {
             'isProduct' => function_exists('is_product') && is_product(),
             'isCheckout' => function_exists('is_checkout') && is_checkout(),
             'isCart' => function_exists('is_cart') && is_cart(),
-            'currency' => function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : '',
+            'isOrderReceived' => (bool) $order,
+            'orderId' => $order ? $order->get_id() : 0,
+            'orderTotal' => $order ? (float) $order->get_total() : 0,
+            'purchaseEventId' => $order ? $order->get_meta('_smf_purchase_event_id') : '',
+            'currency' => $order ? $order->get_currency() : (function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : ''),
             'metaPixelId' => self::meta_enabled() ? preg_replace('/[^0-9]/', '', (string) get_option('smf_meta_pixel_id', '')) : '',
         ));
+    }
+
+    private static function get_received_order_id() {
+        if (!function_exists('is_order_received_page') || !is_order_received_page()) return 0;
+        $id = absint(get_query_var('order-received'));
+        if (!$id && isset($_GET['order-received'])) $id = absint($_GET['order-received']);
+        return $id;
     }
 
     public static function meta_enabled() {
@@ -43,9 +56,7 @@ class SMF_Tracker {
     public static function render_script() {
         if (is_admin()) return;
         $values = array();
-        foreach (array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term') as $key) {
-            if (isset($_GET[$key])) $values[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
-        }
+        foreach (array('fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term') as $key) if (isset($_GET[$key])) $values[$key] = sanitize_text_field(wp_unslash($_GET[$key]));
         echo '<script>window.SMF_ATTRIBUTION=' . wp_json_encode($values) . ';</script>';
     }
 
