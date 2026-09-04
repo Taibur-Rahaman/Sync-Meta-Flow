@@ -60,6 +60,7 @@ class SMF_Courier_State {
         if (!$order) return $result;
         $current = self::normalize($order->get_status());
         if (self::transition_allowed($current, $target)) return $result;
+        if (class_exists('SMF_Courier_Timeline')) SMF_Courier_Timeline::mark_webhook_ignored($request);
         return new WP_REST_Response(array(
             'ok' => true,
             'ignored' => true,
