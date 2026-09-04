@@ -22,6 +22,7 @@ require_once SMF_DIR.'includes/class-smf-spend.php';
 require_once SMF_DIR.'includes/class-smf-meta-insights.php';
 require_once SMF_DIR.'includes/class-smf-courier.php';
 require_once SMF_DIR.'includes/class-smf-courier-timeline.php';
+require_once SMF_DIR.'includes/class-smf-attribution-report.php';
 require_once SMF_DIR.'includes/class-smf-admin.php';
 register_activation_hook(__FILE__,array('SMF_Installer','activate'));register_deactivation_hook(__FILE__,array('SMF_Installer','deactivate'));
-add_action('plugins_loaded',function(){SMF_Installer::maybe_upgrade();if(!class_exists('WooCommerce')){add_action('admin_notices',function(){if(!current_user_can('activate_plugins'))return;echo '<div class="notice notice-warning"><p><strong>Sync Meta Flow</strong> requires WooCommerce to be installed and active.</p></div>';});return;}SMF_Attribution::init();SMF_Tracker::init();SMF_Order_Status::init();SMF_Order_Events::init();SMF_Meta_CAPI::init();SMF_Spend::init();SMF_Meta_Insights::init();SMF_Courier::init();SMF_Courier_Timeline::init();SMF_Admin::init();});
+add_action('plugins_loaded',function(){SMF_Installer::maybe_upgrade();if(!class_exists('WooCommerce')){add_action('admin_notices',function(){if(!current_user_can('activate_plugins'))return;echo '<div class="notice notice-warning"><p><strong>Sync Meta Flow</strong> requires WooCommerce to be installed and active.</p></div>';});return;}SMF_Attribution::init();SMF_Tracker::init();SMF_Order_Status::init();SMF_Order_Events::init();SMF_Meta_CAPI::init();SMF_Spend::init();SMF_Meta_Insights::init();SMF_Courier::init();SMF_Courier_Timeline::init();SMF_Attribution_Report::init();SMF_Admin::init();});
