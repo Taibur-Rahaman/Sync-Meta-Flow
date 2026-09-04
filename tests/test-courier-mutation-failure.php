@@ -10,11 +10,11 @@ if ($source === false || $timeline === false) {
 }
 
 $checks = array(
-    "try {\n            $order->update_meta_data" => 'order mutation is protected by exception handling',
-    "} catch (Throwable $e) {" => 'mutation exceptions are caught',
+    'try {\n            $order->update_meta_data' => 'order mutation is protected by exception handling',
+    '} catch (Throwable $e) {' => 'mutation exceptions are caught',
     "new WP_Error('smf_webhook_mutation_failed'" => 'mutation failure becomes a retryable REST error',
     "'status'=>500" => 'mutation failure returns HTTP 500',
-    "the event will remain retryable" => 'failure response documents retry semantics',
+    'the event will remain retryable' => 'failure response documents retry semantics',
     "WHERE event_hash=%s AND result='processing'" => 'timeline result changes only the claimed processing event',
     "($code>=200&&$code<300)?'processed':'failed'" => 'only successful REST responses become processed',
 );
