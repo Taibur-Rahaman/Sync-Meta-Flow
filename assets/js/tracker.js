@@ -12,18 +12,32 @@
     var expires = new Date(Date.now() + days * 864e5).toUTCString();
     document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/; SameSite=Lax';
   }
+  function eventId(name) {
+    if (window.crypto && window.crypto.randomUUID) return 'smf-' + name + '-' + window.crypto.randomUUID();
+    return 'smf-' + name + '-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  }
   function send(eventName, payload) {
     if (!data.ajaxUrl || !data.nonce) return;
     var body = new URLSearchParams();
-    body.set('action', 'smf_track_event');
-    body.set('nonce', data.nonce);
-    body.set('event', eventName);
+    body.set('action', 'smf_track_event'); body.set('nonce', data.nonce); body.set('event', eventName);
     body.set('payload', JSON.stringify(payload || {}));
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(data.ajaxUrl, body);
-    } else if (window.fetch) {
-      fetch(data.ajaxUrl, { method: 'POST', body: body, credentials: 'same-origin', keepalive: true });
-    }
+    if (navigator.sendBeacon) navigator.sendBeacon(data.ajaxUrl, body);
+    else if (window.fetch) fetch(data.ajaxUrl, { method: 'POST', body: body, credentials: 'same-origin', keepalive: true });
+  }
+  function metaTrack(name, payload, id) {
+    if (typeof window.fbq !== 'function' || !data.metaPixelId) return;
+    var params = payload || {};
+    if (id) params.eventID = id;
+    window.fbq('track', name, params, id ? {eventID: id} : undefined);
+  }
+  function track(eventName, payload, metaName) {
+    payload = payload || {};
+    payload.page_url = window.location.href;
+    payload.session_key = data.sessionKey || '';
+    payload.event_id = payload.event_id || eventId(eventName);
+    send(eventName, payload);
+    if (metaName) metaTrack(metaName, payload, payload.event_id);
+    return payload.event_id;
   }
 
   if (Object.keys(attribution).length) {
@@ -34,32 +48,17 @@
   }
 
   window.SMF = window.SMF || {};
-  window.SMF.track = function (eventName, payload) {
-    payload = payload || {};
-    payload.page_url = window.location.href;
-    payload.session_key = data.sessionKey || '';
-    send(eventName, payload);
-  };
+  window.SMF.track = track;
+  track('page_view', {}, 'PageView');
 
-  // Standard funnel events.
-  window.SMF.track('page_view');
-
-  if (data.isProduct) {
-    window.SMF.track('view_content', {
-      product_id: data.productId || 0,
-      product_name: data.productName || ''
-    });
-  }
+  if (data.isProduct) track('view_content', { product_id: data.productId || 0, product_name: data.productName || '' }, 'ViewContent');
 
   if (window.jQuery) {
     jQuery(document.body).on('added_to_cart', function (event, fragments, cartHash, button) {
       var productId = button && button.data ? button.data('product_id') : data.productId;
-      window.SMF.track('add_to_cart', { product_id: productId || 0 });
+      track('add_to_cart', { product_id: productId || 0 }, 'AddToCart');
     });
-    jQuery(document.body).on('checkout_error', function () {
-      window.SMF.track('checkout_error');
-    });
+    jQuery(document.body).on('checkout_error', function () { track('checkout_error'); });
   }
-
-  if (data.isCheckout) window.SMF.track('initiate_checkout');
+  if (data.isCheckout) track('initiate_checkout', {}, 'InitiateCheckout');
 })();
