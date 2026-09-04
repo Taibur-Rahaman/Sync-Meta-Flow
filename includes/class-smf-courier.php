@@ -106,16 +106,42 @@ class SMF_Courier {
     private static function shipment_lock_key($order_id) { return 'smf_shipment_lock_'.absint($order_id); }
 
     private static function acquire_shipment_lock($order_id) {
+        global $wpdb;
         $key = self::shipment_lock_key($order_id);
         $token = wp_generate_uuid4();
-        if (get_transient($key)) return false;
-        set_transient($key, $token, self::SHIPMENT_LOCK_TTL);
-        return get_transient($key) === $token ? $token : false;
+        $now = time();
+        $value = $token . ':' . $now;
+        $inserted = $wpdb->query($wpdb->prepare(
+            "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')",
+            $key,
+            $value
+        ));
+        if ($inserted === 1) return $token;
+
+        $cutoff = $now - self::SHIPMENT_LOCK_TTL;
+        $replaced = $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->options} SET option_value = %s, autoload = 'no' WHERE option_name = %s AND CAST(SUBSTRING_INDEX(option_value, ':', -1) AS UNSIGNED) <= %d",
+            $value,
+            $key,
+            $cutoff
+        ));
+        if ($replaced !== 1) return false;
+
+        wp_cache_delete($key, 'options');
+        return get_option($key, '') === $value ? $token : false;
     }
 
     private static function release_shipment_lock($order_id, $token) {
+        global $wpdb;
+        if (!$token) return;
         $key = self::shipment_lock_key($order_id);
-        if ($token && get_transient($key) === $token) delete_transient($key);
+        $value = get_option($key, '');
+        if ($value !== $token . ':' . substr((string)$value, strrpos((string)$value, ':') + 1)) {
+            $parts = explode(':', (string)$value, 2);
+            if (count($parts) !== 2 || $parts[0] !== $token) return;
+        }
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value LIKE %s", $key, $token . ':%'));
+        wp_cache_delete($key, 'options');
     }
 
     private static function create_steadfast_order($order) {
