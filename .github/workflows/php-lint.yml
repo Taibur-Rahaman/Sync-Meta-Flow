@@ -31,3 +31,6 @@ jobs:
       - name: Courier state transition tests
         if: matrix.php-version == '8.3'
         run: php tests/test-courier-state.php
+      - name: Courier identity tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-identity.php
