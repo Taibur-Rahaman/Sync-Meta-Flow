@@ -14,7 +14,7 @@ class SMF_Security {
     }
 
     public static function protect_courier_webhook($result, $server, $request) {
-        if (strpos((string) $request->get_route(), self::COURIER_ROUTE) !== 0 || strtoupper($request->get_method()) !== 'POST') {
+        if ((string) $request->get_route() !== self::COURIER_ROUTE || strtoupper($request->get_method()) !== 'POST') {
             return $result;
         }
 
