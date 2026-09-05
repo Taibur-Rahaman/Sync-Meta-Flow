@@ -1,0 +1,4 @@
+<?php
+// Static behavioral regression guard for Phase 2.13.
+$root=dirname(__DIR__);$file=$root.'/includes/class-smf-decision-engine.php';$main=$root.'/sync-meta-flow.php';if(!is_file($file))exit(1);$src=file_get_contents($file);$main_src=file_get_contents($main);
+$checks=array('class SMF_Decision_Engine','function recommendations','SMF_Profitability::report','HIGH','MEDIUM','Scale','Stop or review','courier','CAPI failures','contribution profit','recommendations are advisory','never change ad budgets');foreach($checks as $needle)if(strpos($src,$needle)===false){fwrite(STDERR,"Missing decision-engine invariant: {$needle}\n");exit(1);}if(strpos($main_src,'class-smf-decision-engine.php')===false||strpos($main_src,'SMF_Decision_Engine::init()')===false){fwrite(STDERR,"Missing decision-engine bootstrap invariant.\n");exit(1);}echo "Phase 2.13 decision intelligence regression checks passed.\n";

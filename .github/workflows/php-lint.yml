@@ -1,0 +1,78 @@
+name: PHP lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['7.4', '8.2', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+      - name: Lint PHP files
+        shell: bash
+        run: |
+          set -e
+          find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Attribution behavioral tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-attribution-model.php
+      - name: Courier behavioral tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-operations.php
+      - name: Courier state transition tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-state.php
+      - name: Courier identity tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-identity.php
+      - name: Courier shipment hardening tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-operations-hardening.php
+      - name: Courier atomic lock tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-lock-atomic.php
+      - name: Courier replay tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-replay.php
+      - name: Courier mutation failure tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-mutation-failure.php
+      - name: Courier recovery tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-recovery.php
+      - name: Courier recovery reliability tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-recovery-reliability.php
+      - name: Courier provider intelligence tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-provider-intelligence.php
+      - name: Courier delivery and financial intelligence tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-courier-delivery-financial.php
+      - name: Profitability intelligence tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-profitability-intelligence.php
+      - name: Executive dashboard tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-executive-dashboard.php
+      - name: Decision intelligence tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-decision-engine.php
+      - name: Release hardening tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-release-hardening.php
+      - name: CAPI idempotency tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-capi-idempotency.php
+      - name: CAPI retry classification tests
+        if: matrix.php-version == '8.3'
+        run: php tests/test-capi-retry.php
