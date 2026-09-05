@@ -9,9 +9,20 @@ License: GPLv2 or later
 
 WooCommerce revenue intelligence for Meta-driven stores. Sync Meta Flow connects advertising attribution, WooCommerce order milestones, courier delivery outcomes and realized revenue so merchants can optimize for delivered business outcomes rather than purchases alone.
 
+== Description ==
+
+Sync Meta Flow helps Meta-driven WooCommerce stores measure delivered business outcomes — not purchases alone — with attribution, order-flow, courier intelligence, profitability estimates, and an advisory Decision Center.
+
+V3 beta adds controlled automation, advanced attribution models, courier intelligence, commercial entitlements, and an AI merchant assistant. All V3 capabilities are disabled by default.
+
+This 3.5.0-beta.1 line is a beta release. Use it for evaluation or staging; do not treat it as fully staging-validated production-stable software until that validation is complete.
+
+Official installable ZIP: https://github.com/Taibur-Rahaman/Sync-Meta-Flow/releases/tag/v3.5.0-beta.1
+
 == 3.5.0-beta.1 — AI Merchant Assistant ==
 * Added AI intelligence layer with swappable provider, safe context builder, explainable answers, and no autonomous execution.
 * AI may rank deterministic recommendations but cannot override automation policy.
+* Published customer-ready ZIP on GitHub Releases for WordPress upload install.
 
 == 3.4.0-beta.1 — Commercial SaaS Foundation ==
 * Added merchant identity, plan/capability entitlements, license states (incl. trial/grace), opt-in aggregate telemetry, and WordPress-standard update compatibility snapshot.
@@ -164,9 +175,10 @@ The plugin integrates with WordPress privacy-policy guidance, personal-data expo
 Uninstall preserves data by default. When the merchant explicitly enables deletion, plugin-owned tables, options and scheduled jobs are removed, including the courier recovery retry job.
 
 == Installation ==
-1. Install and activate WooCommerce.
-2. Upload the Sync Meta Flow folder to `wp-content/plugins/` or install an installable ZIP.
-3. Activate Sync Meta Flow. Existing installations automatically run the versioned schema/option upgrade.
+1. Download `sync-meta-flow-3.5.0-beta.1.zip` from GitHub Releases:
+   https://github.com/Taibur-Rahaman/Sync-Meta-Flow/releases/tag/v3.5.0-beta.1
+2. In WordPress go to Plugins → Add New Plugin → Upload Plugin, select the ZIP, Install Now, then Activate.
+3. Confirm WooCommerce is installed and active. Existing installations automatically run the versioned schema/option upgrade.
 4. Open Meta Flow > Setup and configure the Meta Pixel and optional CAPI access token.
 5. Open Meta Flow > Diagnostics and resolve blocking checks.
 6. Open Meta Flow > Meta Ads Sync, enter the Meta Ad Account ID, save and run an initial sync.
@@ -174,7 +186,8 @@ Uninstall preserves data by default. When the merchant explicitly enables deleti
 8. Open Meta Flow > Profitability to configure COGS, payment fees and courier cost assumptions.
 9. Review Meta Flow > Executive Dashboard and Meta Flow > Decision Center for merchant-level actions.
 10. Configure Courier & Delivery and Courier Operations if a courier workflow is needed.
-11. For Steadfast, enter merchant credentials and create shipments from WooCommerce orders.
+11. Leave V3 beta flags off unless you intentionally enable automation, advanced attribution, courier intelligence, commercial, or AI features.
+12. Do not upload a full repository ZIP that includes `tests/` or `.git/`. Use the official Releases asset only.
 
 == Setup Assistant ==
 The optional Setup Assistant reviews compatibility, Meta tracking, attribution, courier readiness and profitability assumptions without changing existing merchant settings. Meta and courier setup can be skipped explicitly. The readiness score is a deterministic orientation aid; it is not a guarantee of external API, consent, delivery, or accounting outcomes. Existing stores are not redirected into the assistant.
@@ -195,9 +208,22 @@ Diagnostics includes a bounded operational view of CAPI queues, courier webhook 
 * Confirm WooCommerce HPOS and current WooCommerce compatibility on the target store.
 
 == Release status ==
-3.0.0-beta.1 is an architecture foundation release. V2 remains the operational path; live staging tests remain required for each merchant's Meta account, WooCommerce version, theme, consent configuration and courier provider. Contribution-profit recommendations remain advisory and depend on merchant-configured assumptions.
+3.5.0-beta.1 completes the V3 beta roadmap through AI Merchant Assistant. V2 remains the default operational path; V3 features stay disabled until explicitly enabled. Live staging validation is still required for each merchant's Meta account, WooCommerce version, theme, consent configuration and courier provider. Contribution-profit and AI answers remain advisory. Do not treat this beta as a fully staging-validated production release.
+
+Installable customer ZIP: https://github.com/Taibur-Rahaman/Sync-Meta-Flow/releases/tag/v3.5.0-beta.1
 
 == Changelog ==
+= 3.5.0-beta.1 =
+* Added AI merchant assistant with swappable provider, safe context builder, explainability, and no autonomous execution.
+* Completed commercial entitlement foundation and GitHub Releases packaging for WordPress upload install.
+= 3.4.0-beta.1 =
+* Added merchant identity, plan/capability entitlements, license states, and opt-in aggregate telemetry foundation.
+= 3.3.0-beta.1 =
+* Added V3 courier intelligence with advisory provider recommendations (no auto-reassignment).
+= 3.2.0-beta.1 =
+* Extended attribution with position-based and time-decay estimates plus quality scoring pipeline.
+= 3.1.0-beta.1 =
+* Added controlled automation pipeline with policy, approval, idempotency, dry-run, verification and audit.
 = 3.0.0-beta.1 =
 * Added the additive V3 contract, domain, event, adapter, container, and feature-flag foundation.
 * Preserved V2 behavior and documented migration and rollback boundaries.
