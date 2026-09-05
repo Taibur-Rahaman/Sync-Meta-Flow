@@ -1,0 +1,77 @@
+(function () {
+  'use strict';
+  var data = window.SMF_DATA || {};
+  var attribution = window.SMF_ATTRIBUTION || {};
+  var keys = ['fbclid','utm_source','utm_medium','utm_campaign','utm_content','utm_term','utm_id','campaign_id','adset_id','ad_id'];
+
+  function readCookie(name) {
+    var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+  function writeCookie(name, value, days) {
+    var expires = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/; SameSite=Lax';
+  }
+  function eventId(name) {
+    if (window.crypto && window.crypto.randomUUID) return 'smf-' + name + '-' + window.crypto.randomUUID();
+    return 'smf-' + name + '-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  }
+  function send(eventName, payload) {
+    if (!data.ajaxUrl || !data.nonce) return;
+    var body = new URLSearchParams();
+    body.set('action', 'smf_track_event'); body.set('nonce', data.nonce); body.set('event', eventName);
+    body.set('payload', JSON.stringify(payload || {}));
+    if (navigator.sendBeacon) navigator.sendBeacon(data.ajaxUrl, body);
+    else if (window.fetch) fetch(data.ajaxUrl, { method: 'POST', body: body, credentials: 'same-origin', keepalive: true });
+  }
+  function metaTrack(name, payload, id) {
+    if (typeof window.fbq !== 'function' || !data.metaPixelId) return;
+    var params = Object.assign({}, payload || {});
+    delete params.session_key; delete params.page_url; delete params.event_id; delete params.fbp; delete params.fbc;
+    window.fbq('track', name, params, id ? { eventID: id } : undefined);
+  }
+  function track(eventName, payload, metaName, forcedId) {
+    payload = payload || {};
+    payload.page_url = window.location.href;
+    payload.session_key = data.sessionKey || '';
+    payload.fbp = data.fbp || readCookie('_fbp') || '';
+    payload.fbc = data.fbc || readCookie('smf_fbc') || '';
+    payload.event_id = forcedId || payload.event_id || eventId(eventName);
+    send(eventName, payload);
+    if (metaName) metaTrack(metaName, payload, payload.event_id);
+    return payload.event_id;
+  }
+
+  if (attribution.fbclid) {
+    var fbc = readCookie('smf_fbc');
+    if (!fbc) {
+      fbc = 'fb.1.' + Date.now() + '.' + attribution.fbclid;
+      writeCookie('smf_fbc', fbc, 90);
+    }
+  }
+  if (Object.keys(attribution).length) {
+    var existing = {};
+    try { existing = JSON.parse(readCookie('smf_attribution') || '{}'); } catch (e) {}
+    keys.forEach(function (key) { if (attribution[key]) existing[key] = attribution[key]; });
+    writeCookie('smf_attribution', JSON.stringify(existing), 30);
+  }
+
+  window.SMF = window.SMF || {};
+  window.SMF.track = track;
+  track('page_view', {}, 'PageView');
+  if (data.isProduct) track('view_content', { product_id: data.productId || 0, product_name: data.productName || '' }, 'ViewContent');
+
+  if (window.jQuery) {
+    jQuery(document.body).on('added_to_cart', function (event, fragments, cartHash, button) {
+      var productId = button && button.data ? button.data('product_id') : data.productId;
+      track('add_to_cart', { product_id: productId || 0 }, 'AddToCart');
+    });
+    jQuery(document.body).on('checkout_error', function () { track('checkout_error'); });
+  }
+  if (data.isCheckout) track('initiate_checkout', {}, 'InitiateCheckout');
+
+  if (data.isOrderReceived && data.purchaseEventId) {
+    var purchasePayload = { value: Number(data.orderTotal || 0), currency: data.currency || '', order_id: String(data.orderId || '') };
+    track('purchase', purchasePayload, 'Purchase', data.purchaseEventId);
+  }
+})();
